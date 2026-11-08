@@ -1,0 +1,31 @@
+included:
+  - Sources
+  - Tests
+excluded:
+  - .build
+  - build
+
+opt_in_rules:
+  - closure_spacing
+  - empty_count
+  - explicit_init
+  - fatal_error_message
+  - first_where
+  - modifier_order
+  - redundant_nil_coalescing
+  - sorted_first_last
+  - toggle_bool
+  - unused_import
+  - vertical_whitespace_closing_braces
+
+line_length:
+  warning: 120
+  error: 140
+  ignores_comments: true
+  ignores_urls: true
+
+identifier_name:
+  excluded: [id, x, y, i]
+
+type_body_length:
+  warning: 250

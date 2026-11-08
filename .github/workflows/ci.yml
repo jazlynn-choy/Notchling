@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so the bundle script can compute version/build numbers
+
+      - name: Toolchain
+        run: swift --version
+
+      - name: Lint
+        run: |
+          which swiftlint || brew install swiftlint
+          swiftlint lint --strict --reporter github-actions-logging
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
+
+      - name: Bundle app
+        run: scripts/bundle.sh
+
+      - name: Upload app
+        uses: actions/upload-artifact@v4
+        with:
+          name: Notchling.app
+          path: build/Notchling.app
+          retention-days: 14
