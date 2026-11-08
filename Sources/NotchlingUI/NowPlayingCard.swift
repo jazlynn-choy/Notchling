@@ -73,7 +73,7 @@ struct NowPlayingCard: View {
                     .fill(LinearGradient(colors: gradient, startPoint: .topLeading, endPoint: .bottomTrailing))
                 if let url = model.track?.artworkURL {
                     AsyncImage(url: url) { image in
-                        image.resizable().aspectRatio(contentMode: .fill)
+                        image.resizable().scaledToFill()
                     } placeholder: {
                         Color.clear
                     }

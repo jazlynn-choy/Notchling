@@ -14,6 +14,7 @@ struct AgentActivityTests {
     let now = Date(timeIntervalSince1970: 1_794_063_600)
 
     @Test func parsesHookJSONLeniently() throws {
+        // swiftlint:disable:next line_length - fixture kept on one line, as the real output is
         let json = #"{"session_id":"s1","hook_event_name":"PreToolUse","cwd":"/Users/me/Camera Notch","tool_name":"Edit","tool_input":{"file_path":"/x/NotchView.swift"},"extra":{"ignored":true}}"#
         let event = try #require(AgentEvent(json: Data(json.utf8)))
         #expect(event == AgentEvent(sessionID: "s1", name: "PreToolUse", cwd: "/Users/me/Camera Notch",
@@ -161,6 +162,7 @@ struct ClaudeHookTests {
 
     @Test func scriptSavesTheEventWithoutPromptsOrFileContents() throws {
         let home = makeTempDirectory()
+        // swiftlint:disable:next line_length - fixture kept on one line, as the real output is
         let json = #"{"session_id":"abc-123","hook_event_name":"PreToolUse","cwd":"/p","prompt":"my secret plan","tool_name":"Write","tool_input":{"file_path":"/p/a.swift","content":"let password = 1"}}"#
         let result = try runHook(json, home: home)
         #expect(result.status == 0)

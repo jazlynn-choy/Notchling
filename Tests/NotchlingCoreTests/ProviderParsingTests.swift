@@ -44,8 +44,9 @@ struct ProviderParsingTests {
     }
 
     @Test func parsesSearchResultsAndSkipsBrokenRecords() {
-        let rs = AppleScriptMediaProvider.recordSeparator
-        let output = "A1\(sep)Espresso\(sep)Sabrina Carpenter\(rs)broken\(rs)\(sep)No ID\(sep)X\(rs)B2\(sep)Juno\(sep)Sabrina Carpenter\(rs)"
+        let records = AppleScriptMediaProvider.recordSeparator
+        // swiftlint:disable:next line_length - fixture kept on one line, as the real output is
+        let output = "A1\(sep)Espresso\(sep)Sabrina Carpenter\(records)broken\(records)\(sep)No ID\(sep)X\(records)B2\(sep)Juno\(sep)Sabrina Carpenter\(records)"
         #expect(AppleScriptMediaProvider.parseSearchResults(output) == [
             SongResult(id: "A1", title: "Espresso", artist: "Sabrina Carpenter"),
             SongResult(id: "B2", title: "Juno", artist: "Sabrina Carpenter"),

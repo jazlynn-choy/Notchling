@@ -31,11 +31,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hookSetup = ClaudeHookSetup()
     private lazy var agents = AgentStatusStore(
         source: DirectoryAgentEventSource(directory: hookSetup.installer.eventsDirectory))
-    private var agentTimer: Timer?
     private let editor = PanelEditor()
-    private var spotifyTimer: Timer?
-    private var calendarTimer: Timer?
-    private var weatherTimer: Timer?
+    // Background refreshes. Each runs only while a widget needs it (see `observeFeatures`).
+    private lazy var calendarLoop = RepeatingTask(every: 15 * 60) { [calendar] in await calendar.reload() }
+    private lazy var weatherLoop = RepeatingTask(every: WeatherStore.maxAge) { [weather] in await weather.refresh() }
+    private lazy var agentLoop = RepeatingTask(every: 1) { [agents] in agents.refresh() }
+    private lazy var spotifyLoop = RepeatingTask(every: 30 * 60) { [spotify] in await spotify.keepAlive() }
     private var modelSubscriptions = Set<AnyCancellable>()
     private var model: NotchModel!
     private var panel: NotchPanel!
@@ -51,9 +52,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         screen = NSScreen.withNotch ?? NSScreen.main ?? NSScreen.screens[0]
         startModel(notchSize: screen.notchSize)
         buildPanel()
-        observe()
+        observeScreenAndSettings()
+        observeFeatures()
         Task { await reminders.reload() }
-        keepSpotifyConnected()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        notes.saveNow()
     }
 
     /// (Re)creates the live model and everything that listens to it.
@@ -89,7 +94,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.orderFrontRegardless()
     }
 
-    private func observe() {
+    private func showSettings() {
+        setExpanded(false)
+        if settingsWindow == nil {
+            let host = NSHostingView(rootView: SettingsView()
+                .environmentObject(settings)
+                .environmentObject(reminders)
+                .environmentObject(calendar)
+                .environmentObject(weather)
+                .environmentObject(spotify)
+                .environmentObject(hookSetup))
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 720),
+                                  styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            window.title = "Notchling Settings"
+            window.contentView = host
+            window.isReleasedWhenClosed = false
+            window.center()
+            settingsWindow = window
+        }
+        NSApp.activate()
+        settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+}
+
+// MARK: - Wiring
+
+extension AppDelegate {
+    private func observeScreenAndSettings() {
         NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.screenParametersChanged() }
@@ -101,40 +132,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self] _ in self?.reposition() }
             .store(in: &subscriptions)
 
-        // Only run the AppleScript now-playing poll while some widget actually shows music.
-        settings.$widgets
-            .map { $0.allWidgets.contains(where: \.usesMedia) }
-            .removeDuplicates()
-            .sink { [weak self] enabled in self?.model.mediaEnabled = enabled }
-            .store(in: &subscriptions)
-
-        // Calendar is only read while a calendar widget is in the layout. A slow timer keeps
-        // "next event" current across midnight; edits arrive through EKEventStoreChanged.
-        settings.$widgets
-            .map { $0.allWidgets.contains(where: \.usesCalendar) }
-            .removeDuplicates()
-            .sink { [weak self] enabled in self?.setCalendarEnabled(enabled) }
-            .store(in: &subscriptions)
-
-        // Weather is only fetched while a weather widget is in the layout.
-        settings.$widgets
-            .map { $0.allWidgets.contains(where: \.usesWeather) }
-            .removeDuplicates()
-            .sink { [weak self] enabled in self?.setWeatherEnabled(enabled) }
-            .store(in: &subscriptions)
-
-        // Claude Code activity: a cheap directory read once a second, only while a widget shows it.
-        settings.$widgets
-            .map { $0.allWidgets.contains(where: \.usesAgent) }
-            .removeDuplicates()
-            .sink { [weak self] enabled in self?.setAgentWatching(enabled) }
-            .store(in: &subscriptions)
-        agents.onAttention = { [weak self] session in
-            guard let self, settings.agentChime else { return }
-            NSSound(named: session.state == .needsInput ? "Funk" : "Glass")?.play()
-            NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
-        }
-
         settings.$musicSource
             .removeDuplicates()
             .sink { [weak self] source in
@@ -142,24 +139,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.model.preferredApp = source
             }
             .store(in: &subscriptions)
-
-        focus.onFinish = {
-            NSSound(named: "Glass")?.play()
-            NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
-        }
-
-        // Typing needs the panel to be the key window; a non-activating panel only becomes
-        // key on its own when a text field is clicked, not when search opens from a button.
-        search.$isOpen
-            .removeDuplicates()
-            .sink { [weak self] open in if open { self?.panel.makeKey() } }
-            .store(in: &subscriptions)
-        search.onPlay = { [weak self] in
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(400))
-                await self?.model.refreshMedia()
-            }
-        }
 
         settings.$reminderListID
             .removeDuplicates()
@@ -173,6 +152,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Each feature costs nothing until a widget that needs it is in the layout.
+    private func observeFeatures() {
+        whileShown(\.usesMedia) { [weak self] in self?.model.mediaEnabled = $0 }
+        whileShown(\.usesCalendar) { [calendarLoop] in calendarLoop.setRunning($0) }   // + EKEventStoreChanged
+        whileShown(\.usesWeather) { [weatherLoop] in weatherLoop.setRunning($0) }
+        whileShown(\.usesAgent) { [agentLoop] in agentLoop.setRunning($0) }        // a cheap directory read
+
+        // Spotify: renew the sign-in at launch, every 30 minutes and after every wake.
+        spotifyLoop.setRunning(true)
+        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)
+            .sink { [spotifyLoop] _ in spotifyLoop.fire() }
+            .store(in: &subscriptions)
+
+        agents.onAttention = { [weak self] session in
+            guard let self, settings.agentChime else { return }
+            Self.chime(session.state == .needsInput ? "Funk" : "Glass")
+        }
+        focus.onFinish = { Self.chime("Glass") }
+
+        // Typing needs the panel to be the key window; a non-activating panel only becomes
+        // key on its own when a text field is clicked, not when search opens from a button.
+        search.$isOpen
+            .removeDuplicates()
+            .sink { [weak self] open in if open { self?.panel.makeKey() } }
+            .store(in: &subscriptions)
+        search.onPlay = { [weak self] in
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(400))
+                await self?.model.refreshMedia()
+            }
+        }
+    }
+
+    /// Calls `apply(true)` when a widget matching `uses` enters the layout, `false` when the last one leaves.
+    private func whileShown(_ uses: @escaping (WidgetKind) -> Bool, _ apply: @escaping (Bool) -> Void) {
+        settings.$widgets
+            .map { $0.allWidgets.contains(where: uses) }
+            .removeDuplicates()
+            .sink(receiveValue: apply)
+            .store(in: &subscriptions)
+    }
+
+    private static func chime(_ sound: String) {
+        NSSound(named: sound)?.play()
+        NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+    }
+}
+
+// MARK: - Window position and hover
+
+extension AppDelegate {
     private func screenParametersChanged() {
         let current = NSScreen.withNotch ?? NSScreen.main ?? NSScreen.screens[0]
         if current.notchSize != model.notchSize {
@@ -224,8 +254,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task {
                 await model.refreshMedia()
                 await reminders.reload()
-                if calendarTimer != nil { await calendar.reload() }
-                if weatherTimer != nil { await weather.refresh() }
+                if calendarLoop.isRunning { await calendar.reload() }
+                if weatherLoop.isRunning { await weather.refresh() }
             }
         } else {
             search.isOpen = false
@@ -236,85 +266,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel.resignKey()
             NSWorkspace.shared.frontmostApplication?.activate()
         }
-    }
-
-    private func setWeatherEnabled(_ enabled: Bool) {
-        weatherTimer?.invalidate()
-        weatherTimer = nil
-        guard enabled else { return }
-        Task { await weather.refresh() }
-        weatherTimer = Timer.scheduledTimer(withTimeInterval: WeatherStore.maxAge, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                Task { await self.weather.refresh() }
-            }
-        }
-    }
-
-    /// Checks the Spotify sign-in at launch, after every wake from sleep, and every 30 minutes,
-    /// renewing it before it can lapse.
-    private func keepSpotifyConnected() {
-        Task { await spotify.keepAlive() }
-        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)
-            .sink { [weak self] _ in
-                guard let self else { return }
-                Task { await self.spotify.keepAlive() }
-            }
-            .store(in: &subscriptions)
-        spotifyTimer = Timer.scheduledTimer(withTimeInterval: 30 * 60, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                Task { await self.spotify.keepAlive() }
-            }
-        }
-    }
-
-    private func setAgentWatching(_ enabled: Bool) {
-        agentTimer?.invalidate()
-        agentTimer = nil
-        guard enabled else { return }
-        agents.refresh()
-        agentTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.agents.refresh() }
-        }
-    }
-
-    func applicationWillTerminate(_ notification: Notification) {
-        notes.saveNow()
-    }
-
-    private func setCalendarEnabled(_ enabled: Bool) {
-        calendarTimer?.invalidate()
-        calendarTimer = nil
-        guard enabled else { return }
-        Task { await calendar.reload() }
-        calendarTimer = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                Task { await self.calendar.reload() }
-            }
-        }
-    }
-
-    private func showSettings() {
-        setExpanded(false)
-        if settingsWindow == nil {
-            let host = NSHostingView(rootView: SettingsView()
-                .environmentObject(settings)
-                .environmentObject(reminders)
-                .environmentObject(calendar)
-                .environmentObject(weather)
-                .environmentObject(spotify)
-                .environmentObject(hookSetup))
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 720),
-                                  styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
-            window.title = "Notchling Settings"
-            window.contentView = host
-            window.isReleasedWhenClosed = false
-            window.center()
-            settingsWindow = window
-        }
-        NSApp.activate()
-        settingsWindow?.makeKeyAndOrderFront(nil)
     }
 }

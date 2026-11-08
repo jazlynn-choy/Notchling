@@ -167,7 +167,9 @@ struct ClockTests {
 @Suite("Weather")
 struct WeatherParsingTests {
     // Trimmed from real Open-Meteo responses.
+    // swiftlint:disable:next line_length - fixture kept on one line, as the real output is
     let geocoding = #"{"results":[{"id":1880252,"name":"Singapore","latitude":1.28967,"longitude":103.85007,"country":"Singapore"},{"name":"London","latitude":42.98,"longitude":-81.23,"country":"Canada","admin1":"Ontario"}],"generationtime_ms":0.1}"#
+    // swiftlint:disable:next line_length - fixture kept on one line, as the real output is
     let forecast = #"{"latitude":1.3,"current":{"time":"2026-11-08T15:30","interval":900,"temperature_2m":26.8,"weather_code":51,"is_day":1},"daily":{"time":["2026-11-08"],"temperature_2m_max":[30.5],"temperature_2m_min":[25.2]}}"#
 
     @Test func parsesPlacesWithRegion() throws {

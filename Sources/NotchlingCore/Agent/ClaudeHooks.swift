@@ -111,13 +111,13 @@ public struct ClaudeHookInstaller: Sendable {
     }
 
     public func install() throws {
-        let fm = FileManager.default
-        try fm.createDirectory(at: eventsDirectory, withIntermediateDirectories: true)
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(at: eventsDirectory, withIntermediateDirectories: true)
         try ClaudeHooks.script.write(to: scriptURL, atomically: true, encoding: .utf8)
-        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
+        try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
         let settings = try readSettings()
-        if fm.fileExists(atPath: settingsURL.path), !fm.fileExists(atPath: backupURL.path) {
-            try fm.copyItem(at: settingsURL, to: backupURL)
+        if fileManager.fileExists(atPath: settingsURL.path), !fileManager.fileExists(atPath: backupURL.path) {
+            try fileManager.copyItem(at: settingsURL, to: backupURL)
         }
         try writeSettings(ClaudeHooks.installing(into: settings, command: command))
     }

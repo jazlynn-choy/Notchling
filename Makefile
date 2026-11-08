@@ -14,8 +14,12 @@ run: app        ## Build the app and (re)launch it
 	@while pgrep -x Notchling >/dev/null; do sleep 0.1; done   # wait so open doesn't race the quit
 	open build/Notchling.app
 
+# SwiftLint needs SourceKit, which ships with Xcode; with only the Command Line Tools it's here instead.
+CLT_SOURCEKIT := /Library/Developer/CommandLineTools/usr/lib
+LINT_ENV := $(if $(wildcard /Applications/Xcode.app),,DYLD_FRAMEWORK_PATH=$(CLT_SOURCEKIT))
+
 lint:           ## SwiftLint, warnings are errors
-	swiftlint lint --strict
+	$(LINT_ENV) swiftlint lint --strict
 
 format:         ## Auto-fix what SwiftLint can
 	swiftlint lint --fix

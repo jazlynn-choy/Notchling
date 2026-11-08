@@ -149,7 +149,8 @@ public final class SpotifyConnection: ObservableObject {
     }
 
     private static func message(from data: Data) -> String {
-        struct Body: Decodable { let error_description: String? }
-        return (try? JSONDecoder().decode(Body.self, from: data))?.error_description ?? "Spotify sign-in failed."
+        struct Body: Decodable { let errorDescription: String? }
+        return (try? SpotifyAuth.snakeCaseDecoder.decode(Body.self, from: data))?.errorDescription
+            ?? "Spotify sign-in failed."
     }
 }

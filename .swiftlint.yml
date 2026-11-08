@@ -15,17 +15,31 @@ opt_in_rules:
   - redundant_nil_coalescing
   - sorted_first_last
   - toggle_bool
-  - unused_import
   - vertical_whitespace_closing_braces
 
+analyzer_rules:
+  - unused_import
+
+disabled_rules:
+  # WidgetKind spells out its raw values on purpose: they're persisted, so renaming a case
+  # must never silently change what's stored.
+  - redundant_string_enum_value
+  # Trailing commas keep diffs to one line when a list grows.
+  - trailing_comma
+
 line_length:
-  warning: 120
-  error: 140
+  warning: 140
   ignores_comments: true
   ignores_urls: true
+  ignores_multiline_strings: true
 
 identifier_name:
-  excluded: [id, x, y, i]
+  # Short names that are conventional here: coordinates, column/row indices, and
+  # argument labels that read as English (`newColumn(at:)`, `move(to:)`).
+  excluded: [id, x, y, i, a, b, c, r, at, to, up, ok]
+
+large_tuple:
+  warning: 3
 
 type_body_length:
   warning: 250

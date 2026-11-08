@@ -150,42 +150,62 @@ public struct OpenMeteoWeatherProvider: WeatherProviding {
     }
 
     public static func parsePlaces(_ data: Data) throws -> [Place] {
-        struct Response: Decodable {
-            struct Result: Decodable {
-                let name: String
-                let latitude: Double
-                let longitude: Double
-                let country: String?
-                let admin1: String?
-            }
-            let results: [Result]?   // missing entirely when nothing matches
-        }
-        return try JSONDecoder().decode(Response.self, from: data).results?.map {
+        try decoder.decode(GeocodingResponse.self, from: data).results?.map {
             Place(name: $0.name, region: [$0.admin1, $0.country].compactMap { $0 }.joined(separator: ", "),
                   latitude: $0.latitude, longitude: $0.longitude)
         } ?? []
     }
 
     public static func parseReport(_ data: Data, now: Date) throws -> WeatherReport {
-        struct Response: Decodable {
-            struct Current: Decodable {
-                let temperature_2m: Double
-                let weather_code: Int
-                let is_day: Int
-            }
-            struct Daily: Decodable {
-                let temperature_2m_max: [Double]
-                let temperature_2m_min: [Double]
-            }
-            let current: Current
-            let daily: Daily
-        }
-        let response = try JSONDecoder().decode(Response.self, from: data)
-        return WeatherReport(temperature: response.current.temperature_2m,
-                             high: response.daily.temperature_2m_max.first ?? response.current.temperature_2m,
-                             low: response.daily.temperature_2m_min.first ?? response.current.temperature_2m,
-                             condition: WeatherCondition(wmoCode: response.current.weather_code),
-                             isDay: response.current.is_day == 1,
+        let response = try JSONDecoder().decode(ForecastResponse.self, from: data)
+        let current = response.current
+        return WeatherReport(temperature: current.temperature2m,
+                             high: response.daily.temperature2mMax.first ?? current.temperature2m,
+                             low: response.daily.temperature2mMin.first ?? current.temperature2m,
+                             condition: WeatherCondition(wmoCode: current.weatherCode),
+                             isDay: current.isDay == 1,
                              fetchedAt: now)
+    }
+
+    /// Open-Meteo's keys are snake_case (`temperature_2m`); this maps them to camelCase.
+    private static var decoder: JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return decoder
+    }
+}
+
+private struct GeocodingResponse: Decodable {
+    struct Result: Decodable {
+        let name: String
+        let latitude: Double
+        let longitude: Double
+        let country: String?
+        let admin1: String?
+    }
+    let results: [Result]?   // missing entirely when nothing matches
+}
+
+private struct ForecastResponse: Decodable {
+    let current: ForecastCurrent
+    let daily: ForecastDaily
+}
+
+// Explicit keys: the automatic snake_case conversion turns `temperature_2m` into
+// `temperature2M` (it capitalises after every underscore), which wouldn't match.
+private struct ForecastCurrent: Decodable {
+    let temperature2m: Double
+    let weatherCode: Int
+    let isDay: Int
+    enum CodingKeys: String, CodingKey {
+        case temperature2m = "temperature_2m", weatherCode = "weather_code", isDay = "is_day"
+    }
+}
+
+private struct ForecastDaily: Decodable {
+    let temperature2mMax: [Double]
+    let temperature2mMin: [Double]
+    enum CodingKeys: String, CodingKey {
+        case temperature2mMax = "temperature_2m_max", temperature2mMin = "temperature_2m_min"
     }
 }

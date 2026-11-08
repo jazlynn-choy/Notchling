@@ -50,26 +50,7 @@ public struct SpotifyCatalog: SongCatalog {
     }
 
     public static func parseSearch(_ data: Data) throws -> [SongResult] {
-        struct Response: Decodable {
-            struct Tracks: Decodable { let items: [Item] }
-            struct Item: Decodable {
-                let uri: String
-                let name: String
-                let artists: [Artist]
-                let album: Album?
-            }
-            struct Artist: Decodable { let name: String }
-            struct Album: Decodable {
-                let uri: String?
-                let images: [Image]?
-            }
-            struct Image: Decodable {
-                let url: String
-                let width: Int?
-            }
-            let tracks: Tracks
-        }
-        return try JSONDecoder().decode(Response.self, from: data).tracks.items.map { item in
+        try JSONDecoder().decode(SpotifySearchResponse.self, from: data).tracks.items.map { item in
             // Smallest cover that's still sharp at 2x for a 28 pt thumbnail.
             let image = item.album?.images?
                 .sorted { ($0.width ?? 0) < ($1.width ?? 0) }
@@ -80,4 +61,27 @@ public struct SpotifyCatalog: SongCatalog {
                               artworkURL: image.flatMap { URL(string: $0.url) })
         }
     }
+}
+
+/// The parts of Spotify's `/v1/search?type=track` response that are used.
+private struct SpotifySearchResponse: Decodable {
+    struct Tracks: Decodable { let items: [SpotifyTrack] }
+    let tracks: Tracks
+}
+
+private struct SpotifyTrack: Decodable {
+    struct Artist: Decodable { let name: String }
+    struct Album: Decodable {
+        let uri: String?
+        let images: [SpotifyImage]?
+    }
+    let uri: String
+    let name: String
+    let artists: [Artist]
+    let album: Album?
+}
+
+private struct SpotifyImage: Decodable {
+    let url: String
+    let width: Int?
 }

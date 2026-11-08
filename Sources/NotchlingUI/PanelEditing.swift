@@ -118,9 +118,13 @@ struct DropIndicator: View {
             return frames[c][r]
         case .newColumn(let index):
             let x: CGFloat
-            if frames.isEmpty { x = 0 }
-            else if index >= frames.count { x = (frames.last?.first?.maxX ?? 0) + PanelCards.spacing / 2 }
-            else { x = (frames[index].first?.minX ?? 0) - PanelCards.spacing / 2 }
+            if frames.isEmpty {
+                x = 0
+            } else if index >= frames.count {
+                x = (frames.last?.first?.maxX ?? 0) + PanelCards.spacing / 2
+            } else {
+                x = (frames[index].first?.minX ?? 0) - PanelCards.spacing / 2
+            }
             return CGRect(x: x - 2, y: 0, width: 4, height: height)
         case .above(let kind), .below(let kind):
             guard let c = columns.firstIndex(where: { $0.contains(kind) }),

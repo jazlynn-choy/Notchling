@@ -38,11 +38,11 @@ struct NotchGeometryTests {
 
     @Test func windowFitsBothStates() {
         for wing in [0, 72, 160] as [CGFloat] {
-            let g = geometry(wing: wing)
-            let frame = g.windowFrame(on: screen)
-            #expect(frame.width >= g.collapsedSize.width)
-            #expect(frame.width >= g.expandedSize.width)
-            #expect(frame.height >= g.expandedSize.height)
+            let geometry = geometry(wing: wing)
+            let frame = geometry.windowFrame(on: screen)
+            #expect(frame.width >= geometry.collapsedSize.width)
+            #expect(frame.width >= geometry.expandedSize.width)
+            #expect(frame.height >= geometry.expandedSize.height)
         }
     }
 
@@ -54,9 +54,9 @@ struct NotchGeometryTests {
     }
 
     @Test func panelStaysOpenWithSmallSlackPastItsEdge() {
-        let g = geometry()
-        let rect = g.stayOpenRect(on: screen)
-        let bottom = screen.maxY - g.expandedSize.height
+        let geometry = geometry()
+        let rect = geometry.stayOpenRect(on: screen)
+        let bottom = screen.maxY - geometry.expandedSize.height
         #expect(rect.contains(CGPoint(x: screen.midX, y: bottom - 3)))
         #expect(!rect.contains(CGPoint(x: screen.midX, y: bottom - 20)))
     }

@@ -18,27 +18,27 @@ struct StackingTests {
     }
 
     @Test func weatherCanStackUnderMusic() {
-        var l = layout([[.musicCard], [.remindersCard], [.weatherCard]])
-        let result1 = l.drop(.weatherCard, at: .below(.musicCard))
+        var cards = layout([[.musicCard], [.remindersCard], [.weatherCard]])
+        let result1 = cards.drop(.weatherCard, at: .below(.musicCard))
         #expect(result1)
-        #expect(l.panelColumns == [[.musicCard, .weatherCard], [.remindersCard]])
+        #expect(cards.panelColumns == [[.musicCard, .weatherCard], [.remindersCard]])
     }
 
     @Test func dropAboveAndIntoANewColumn() {
-        var l = layout([[.musicCard, .weatherCard], [.remindersCard]])
-        let result2 = l.drop(.remindersCard, at: .above(.musicCard))
+        var cards = layout([[.musicCard, .weatherCard], [.remindersCard]])
+        let result2 = cards.drop(.remindersCard, at: .above(.musicCard))
         #expect(result2)
-        #expect(l.panelColumns == [[.remindersCard, .musicCard, .weatherCard]])
-        let result3 = l.drop(.weatherCard, at: .newColumn(at: 0))
+        #expect(cards.panelColumns == [[.remindersCard, .musicCard, .weatherCard]])
+        let result3 = cards.drop(.weatherCard, at: .newColumn(at: 0))
         #expect(result3)
-        #expect(l.panelColumns == [[.weatherCard], [.remindersCard, .musicCard]])
+        #expect(cards.panelColumns == [[.weatherCard], [.remindersCard, .musicCard]])
     }
 
     @Test func movingALoneCardRightAccountsForItsOwnColumnDisappearing() {
-        var l = layout([[.musicCard], [.remindersCard], [.weatherCard]])
-        let result101 = l.drop(.musicCard, at: .newColumn(at: 2))   // between reminders and weather
+        var cards = layout([[.musicCard], [.remindersCard], [.weatherCard]])
+        let result101 = cards.drop(.musicCard, at: .newColumn(at: 2))   // between reminders and weather
         #expect(result101)
-        #expect(l.panelColumns == [[.remindersCard], [.musicCard], [.weatherCard]])
+        #expect(cards.panelColumns == [[.remindersCard], [.musicCard], [.weatherCard]])
     }
 
     @Test func limitsAreEnforced() {
@@ -52,34 +52,34 @@ struct StackingTests {
     }
 
     @Test func removingATopCardPromotesTheOneBelow() {
-        var l = layout([[.remindersCard], [.musicCard, .weatherCard]])
-        l.remove(.musicCard, from: .panel)
-        #expect(l.panelColumns == [[.remindersCard], [.weatherCard]])
+        var cards = layout([[.remindersCard], [.musicCard, .weatherCard]])
+        cards.remove(.musicCard, from: .panel)
+        #expect(cards.panelColumns == [[.remindersCard], [.weatherCard]])
     }
 
     @Test func addFillsColumnsThenStacks() {
-        var l = layout([[.musicCard], [.remindersCard], [.weatherCard], [.dayCard]])
-        l.add(.notesCard, to: .panel)
-        #expect(l.panelColumns.count == 4)
-        #expect(l.panelColumns[0] == [.musicCard, .notesCard])
+        var cards = layout([[.musicCard], [.remindersCard], [.weatherCard], [.dayCard]])
+        cards.add(.notesCard, to: .panel)
+        #expect(cards.panelColumns.count == 4)
+        #expect(cards.panelColumns[0] == [.musicCard, .notesCard])
     }
 
     @Test func setStackedTogglesWithTheCardAbove() {
-        var l = layout([[.musicCard], [.weatherCard], [.remindersCard]])
-        let result4 = l.setStacked(.weatherCard, true)
+        var cards = layout([[.musicCard], [.weatherCard], [.remindersCard]])
+        let result4 = cards.setStacked(.weatherCard, true)
         #expect(result4)
-        #expect(l.panelColumns == [[.musicCard, .weatherCard], [.remindersCard]])
-        let result5 = l.setStacked(.weatherCard, false)
+        #expect(cards.panelColumns == [[.musicCard, .weatherCard], [.remindersCard]])
+        let result5 = cards.setStacked(.weatherCard, false)
         #expect(result5)
-        #expect(l.panelColumns == [[.musicCard], [.weatherCard], [.remindersCard]])
-        let result104 = l.setStacked(.musicCard, true)   // nothing above the first card
+        #expect(cards.panelColumns == [[.musicCard], [.weatherCard], [.remindersCard]])
+        let result104 = cards.setStacked(.musicCard, true)   // nothing above the first card
         #expect(!result104)
     }
 
     @Test func reorderingInSettingsGivesTheMovedCardItsOwnColumn() {
-        var l = layout([[.musicCard, .weatherCard], [.remindersCard]])
-        l.move(.musicCard, in: .panel, by: 2)
-        #expect(l.panelColumns == [[.weatherCard], [.remindersCard], [.musicCard]])
+        var cards = layout([[.musicCard, .weatherCard], [.remindersCard]])
+        cards.move(.musicCard, in: .panel, by: 2)
+        #expect(cards.panelColumns == [[.weatherCard], [.remindersCard], [.musicCard]])
     }
 }
 
@@ -90,35 +90,35 @@ struct PanelReorderTests {
     }
 
     @Test func swapTradesPlacesAcrossColumnsAndWithinStacks() {
-        var l = layout([[.musicCard, .weatherCard], [.remindersCard]])
-        let across = l.swap(.weatherCard, .remindersCard)
+        var cards = layout([[.musicCard, .weatherCard], [.remindersCard]])
+        let across = cards.swap(.weatherCard, .remindersCard)
         #expect(across)
-        #expect(l.panelColumns == [[.musicCard, .remindersCard], [.weatherCard]])
-        let within = l.drop(.remindersCard, at: .swap(.musicCard))
+        #expect(cards.panelColumns == [[.musicCard, .remindersCard], [.weatherCard]])
+        let within = cards.drop(.remindersCard, at: .swap(.musicCard))
         #expect(within)
-        #expect(l.panelColumns == [[.remindersCard, .musicCard], [.weatherCard]])
-        let withItself = l.swap(.musicCard, .musicCard)
+        #expect(cards.panelColumns == [[.remindersCard, .musicCard], [.weatherCard]])
+        let withItself = cards.swap(.musicCard, .musicCard)
         #expect(!withItself)
     }
 
     @Test func swappingWithAFullColumnIsAllowed() {
-        var l = layout([[.musicCard, .weatherCard, .dayCard], [.remindersCard]])
-        let swapped = l.drop(.remindersCard, at: .swap(.dayCard))
+        var cards = layout([[.musicCard, .weatherCard, .dayCard], [.remindersCard]])
+        let swapped = cards.drop(.remindersCard, at: .swap(.dayCard))
         #expect(swapped)
-        #expect(l.panelColumns == [[.musicCard, .weatherCard, .remindersCard], [.dayCard]])
+        #expect(cards.panelColumns == [[.musicCard, .weatherCard, .remindersCard], [.dayCard]])
     }
 
     @Test func arrowsMoveColumnsAndStacks() {
-        var l = layout([[.musicCard, .weatherCard], [.remindersCard]])
-        let right = l.moveColumn(containing: .weatherCard, by: 1)   // moves the whole column
+        var cards = layout([[.musicCard, .weatherCard], [.remindersCard]])
+        let right = cards.moveColumn(containing: .weatherCard, by: 1)   // moves the whole column
         #expect(right)
-        #expect(l.panelColumns == [[.remindersCard], [.musicCard, .weatherCard]])
-        let past = l.moveColumn(containing: .musicCard, by: 1)
+        #expect(cards.panelColumns == [[.remindersCard], [.musicCard, .weatherCard]])
+        let past = cards.moveColumn(containing: .musicCard, by: 1)
         #expect(!past)
-        let up = l.moveInStack(.weatherCard, by: -1)
+        let up = cards.moveInStack(.weatherCard, by: -1)
         #expect(up)
-        #expect(l.panelColumns == [[.remindersCard], [.weatherCard, .musicCard]])
-        let tooHigh = l.moveInStack(.weatherCard, by: -1)
+        #expect(cards.panelColumns == [[.remindersCard], [.weatherCard, .musicCard]])
+        let tooHigh = cards.moveInStack(.weatherCard, by: -1)
         #expect(!tooHigh)
     }
 }
@@ -133,10 +133,10 @@ struct PanelGeometryTests {
     }
 
     @Test func framesTileThePanel() {
-        let f = frames
-        #expect(f[0][0] == CGRect(x: 0, y: 0, width: 200, height: 96))
-        #expect(f[0][1] == CGRect(x: 0, y: 104, width: 200, height: 96))
-        #expect(f[1][0] == CGRect(x: 210, y: 0, width: 200, height: 200))
+        let rects = frames
+        #expect(rects[0][0] == CGRect(x: 0, y: 0, width: 200, height: 96))
+        #expect(rects[0][1] == CGRect(x: 0, y: 104, width: 200, height: 96))
+        #expect(rects[1][0] == CGRect(x: 210, y: 0, width: 200, height: 200))
     }
 
     @Test(arguments: [

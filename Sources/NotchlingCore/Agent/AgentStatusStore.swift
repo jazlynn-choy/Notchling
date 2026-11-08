@@ -21,14 +21,14 @@ public struct DirectoryAgentEventSource: AgentEventSource {
     }
 
     public func latestEvents() -> [(event: AgentEvent, date: Date)] {
-        let fm = FileManager.default
-        guard let files = try? fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey],
+        let fileManager = FileManager.default
+        guard let files = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey],
                                                       options: [.skipsHiddenFiles]) else { return [] }
         let now = clock()
         return files.filter { $0.pathExtension == "json" }.compactMap { url in
             let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? now
             if now.timeIntervalSince(date) > maxAge {
-                try? fm.removeItem(at: url)
+                try? fileManager.removeItem(at: url)
                 return nil
             }
             guard let data = try? Data(contentsOf: url), let event = AgentEvent(json: data) else { return nil }

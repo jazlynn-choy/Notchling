@@ -82,16 +82,23 @@ public enum SpotifyAuth {
     /// case the old one stays valid, so it's passed in as the fallback.
     public static func tokens(from data: Data, now: Date, previousRefreshToken: String? = nil) throws -> SpotifyTokens {
         struct Response: Decodable {
-            let access_token: String
-            let expires_in: Double
-            let refresh_token: String?
+            let accessToken: String
+            let expiresIn: Double
+            let refreshToken: String?
         }
-        let response = try JSONDecoder().decode(Response.self, from: data)
-        guard let refresh = response.refresh_token ?? previousRefreshToken else {
+        let response = try snakeCaseDecoder.decode(Response.self, from: data)
+        guard let refresh = response.refreshToken ?? previousRefreshToken else {
             throw SpotifyError.signInFailed("Spotify didn't send a refresh token.")
         }
-        return SpotifyTokens(accessToken: response.access_token, refreshToken: refresh,
-                             expiresAt: now.addingTimeInterval(response.expires_in))
+        return SpotifyTokens(accessToken: response.accessToken, refreshToken: refresh,
+                             expiresAt: now.addingTimeInterval(response.expiresIn))
+    }
+
+    /// Spotify's JSON uses snake_case keys; Swift properties stay camelCase.
+    static var snakeCaseDecoder: JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return decoder
     }
 }
 
