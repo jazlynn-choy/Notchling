@@ -1,5 +1,9 @@
 # Notchling
 
+[![CI](https://github.com/jazlynn-choy/Notchling/actions/workflows/ci.yml/badge.svg)](https://github.com/jazlynn-choy/Notchling/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/jazlynn-choy/Notchling)](https://github.com/jazlynn-choy/Notchling/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A macOS menu-bar companion that turns the dead space around the MacBook camera notch into something useful.
 
 - **Collapsed:** slim black "wings" extend the notch and show what's playing (or the date), your open reminders count, the time, and battery.
@@ -15,6 +19,14 @@ A macOS menu-bar companion that turns the dead space around the MacBook camera n
 - **Everything else is adjustable** in Settings: wing width (down to zero), panel size, which Reminders list, haptics, and open at login.
 
 <!-- TODO: add a screenshot or GIF here — docs/demo.gif -->
+
+## Install
+
+1. Download **Notchling.zip** from the [latest release](https://github.com/jazlynn-choy/Notchling/releases/latest) and unzip it.
+2. Drag **Notchling.app** into **Applications** and open it.
+3. macOS will say it can't check the app for malicious software, because it isn't notarized by Apple (that needs a paid developer account). Go to **System Settings → Privacy & Security**, scroll down, and click **Open Anyway** next to Notchling. You only do this once.
+
+Notchling runs on Apple silicon Macs (every MacBook with a notch is one).
 
 ## Requirements
 
@@ -79,6 +91,20 @@ The core module is covered by 170 tests: stacking, drop targets, drag-to-reorder
 ```bash
 make test
 ```
+
+## Releasing
+
+Releases are built by GitHub Actions. Tag a version and push the tag:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+The [release workflow](.github/workflows/release.yml) runs the tests, builds `Notchling.app` with that version number, zips it, and publishes a GitHub Release with the zip and its SHA-256 checksum.
+
+## License
+
+[MIT](LICENSE)
 
 ## Roadmap
 

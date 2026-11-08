@@ -1,0 +1,39 @@
+name: Release
+
+# Push a tag like v0.2.0 to build, test and publish a release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write   # to create the release
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # tags and history, for the version and build numbers
+
+      - name: Test
+        run: swift test
+
+      - name: Build app
+        run: scripts/bundle.sh
+
+      - name: Zip
+        run: |
+          cd build
+          # ditto keeps the app bundle's structure and code signature intact; plain zip can break them.
+          ditto -c -k --keepParent Notchling.app Notchling.zip
+          shasum -a 256 Notchling.zip > Notchling.zip.sha256
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" build/Notchling.zip build/Notchling.zip.sha256 \
+            --title "Notchling $GITHUB_REF_NAME" \
+            --generate-notes \
+            --notes "**Install:** download Notchling.zip, unzip, move Notchling.app to Applications, open it, then allow it under System Settings → Privacy & Security → Open Anyway (the app isn't notarized). Apple silicon only."
