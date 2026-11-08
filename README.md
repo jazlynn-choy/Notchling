@@ -8,7 +8,7 @@ A macOS menu-bar companion that turns the dead space around the MacBook camera n
   - **Beside the notch:** Claude Code status, now playing, date, time, battery, open reminders, focus timer, next calendar event, weather, world clock, countdown
   - **In the panel (stack cards in up to 4 columns):** Claude Code sessions, music, Reminders, focus timer, Calendar, weather, world clocks, countdown, notes, a Today tile
 - **Claude Code in the notch:** see what each session is doing ("Editing NotchView.swift"), get a chime when it needs your permission or finishes, and see every session in one card.
-- **Arrange it your way:** click the ✏️ in the panel, then drag cards anywhere. Drop a card on another card's lower half to **stack** it underneath (up to 3 per column, 4 columns), or on a column's edge to give it its own column. Drag a card's right edge for width and the bar between stacked cards for height. In Settings, drag rows to reorder and move wing widgets between sides. The whole panel goes up to 900×420 pt.
+- **Arrange it your way:** click the ✏️ in the panel, then drag cards anywhere. Drop a card **in the middle of another to swap them**, on its top or bottom strip to **stack** it above or below (up to 3 per column, 4 columns), or on a column's edge to give it its own column. Arrow buttons on each card move it without dragging. Drag a card's right edge for width and the bar between stacked cards for height. In Settings, drag rows to reorder and move wing widgets between sides. The whole panel goes up to 900×420 pt.
 - **Music, Spotify first:** album art, play/pause/skip, **loop**, and **search all of Spotify**. Picking a song plays it within its album, so the album keeps going. Play works even when nothing's playing yet. The Spotify sign-in renews itself in the background, so it stays connected. Can search your Apple Music library instead.
 - **Focus timer:** 5/15/25/50-minute sessions with a progress ring, a chime when done, and the time left shown beside the notch.
 - **Calendar:** your next event ("Standup 12m") beside the notch, and the rest of today in the panel.
@@ -74,7 +74,7 @@ The architecture, and why it's built this way, is written up in [docs/ARCHITECTU
 
 ## Testing
 
-The core module is covered by 167 tests: stacking, drop targets, drag-to-reorder and resize math, the Claude Code hook script (run for real against sample events) and its settings installer, layout geometry, the widget layout and its migration, card sizing, the focus timer, calendar labels, music search, the Spotify sign-in (including a real loopback-server test), weather parsing and caching, world clocks, date labels, sorting, AppleScript/IOKit parsing, settings persistence, and the reminders sync behaviour. The sync tests run against `FakeRemindersProvider`, so they need no permissions and touch none of your real data.
+The core module is covered by 170 tests: stacking, drop targets, drag-to-reorder and resize math, the Claude Code hook script (run for real against sample events) and its settings installer, layout geometry, the widget layout and its migration, card sizing, the focus timer, calendar labels, music search, the Spotify sign-in (including a real loopback-server test), weather parsing and caching, world clocks, date labels, sorting, AppleScript/IOKit parsing, settings persistence, and the reminders sync behaviour. The sync tests run against `FakeRemindersProvider`, so they need no permissions and touch none of your real data.
 
 ```bash
 make test

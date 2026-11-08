@@ -83,6 +83,46 @@ struct StackingTests {
     }
 }
 
+@Suite("Reordering panel cards")
+struct PanelReorderTests {
+    func layout(_ columns: [[WidgetKind]]) -> WidgetLayout {
+        WidgetLayout(leftWing: [], rightWing: [], columns: columns)
+    }
+
+    @Test func swapTradesPlacesAcrossColumnsAndWithinStacks() {
+        var l = layout([[.musicCard, .weatherCard], [.remindersCard]])
+        let across = l.swap(.weatherCard, .remindersCard)
+        #expect(across)
+        #expect(l.panelColumns == [[.musicCard, .remindersCard], [.weatherCard]])
+        let within = l.drop(.remindersCard, at: .swap(.musicCard))
+        #expect(within)
+        #expect(l.panelColumns == [[.remindersCard, .musicCard], [.weatherCard]])
+        let withItself = l.swap(.musicCard, .musicCard)
+        #expect(!withItself)
+    }
+
+    @Test func swappingWithAFullColumnIsAllowed() {
+        var l = layout([[.musicCard, .weatherCard, .dayCard], [.remindersCard]])
+        let swapped = l.drop(.remindersCard, at: .swap(.dayCard))
+        #expect(swapped)
+        #expect(l.panelColumns == [[.musicCard, .weatherCard, .remindersCard], [.dayCard]])
+    }
+
+    @Test func arrowsMoveColumnsAndStacks() {
+        var l = layout([[.musicCard, .weatherCard], [.remindersCard]])
+        let right = l.moveColumn(containing: .weatherCard, by: 1)   // moves the whole column
+        #expect(right)
+        #expect(l.panelColumns == [[.remindersCard], [.musicCard, .weatherCard]])
+        let past = l.moveColumn(containing: .musicCard, by: 1)
+        #expect(!past)
+        let up = l.moveInStack(.weatherCard, by: -1)
+        #expect(up)
+        #expect(l.panelColumns == [[.remindersCard], [.weatherCard, .musicCard]])
+        let tooHigh = l.moveInStack(.weatherCard, by: -1)
+        #expect(!tooHigh)
+    }
+}
+
 @Suite("Panel frames, drop targets and the height divider")
 struct PanelGeometryTests {
     let columns: [[WidgetKind]] = [[.musicCard, .weatherCard], [.remindersCard]]
@@ -101,13 +141,15 @@ struct PanelGeometryTests {
 
     @Test(arguments: [
         (CGPoint(x: 100, y: 20), WidgetLayout.PanelDrop.above(.musicCard)),
-        (CGPoint(x: 100, y: 70), .below(.musicCard)),
+        (CGPoint(x: 100, y: 85), .below(.musicCard)),     // bottom quarter
+        (CGPoint(x: 100, y: 50), .swap(.musicCard)),      // middle
+        (CGPoint(x: 300, y: 100), .swap(.remindersCard)),
         (CGPoint(x: 100, y: 180), .below(.weatherCard)),
         (CGPoint(x: 10, y: 50), .newColumn(at: 0)),
         (CGPoint(x: 195, y: 50), .newColumn(at: 1)),
         (CGPoint(x: 205, y: 50), .newColumn(at: 1)),   // the gap between columns
         (CGPoint(x: 400, y: 50), .newColumn(at: 2)),
-        (CGPoint(x: 300, y: 150), .below(.remindersCard)),
+        (CGPoint(x: 300, y: 170), .below(.remindersCard)),
     ])
     func dropTargets(point: CGPoint, expected: WidgetLayout.PanelDrop) {
         #expect(PanelLayout.dropTarget(at: point, frames: frames, columns: columns, dragging: .dayCard) == expected)

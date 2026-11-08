@@ -92,15 +92,30 @@ struct DropIndicator: View {
 
     var body: some View {
         let rect = indicatorRect
-        Capsule().fill(Color.accentColor)
-            .shadow(color: .accentColor.opacity(0.8), radius: 4)
-            .frame(width: rect.width, height: rect.height)
-            .offset(x: rect.minX, y: rect.minY)
-            .allowsHitTesting(false)
+        Group {
+            if case .swap = target {
+                // Swapping: outline the card it will trade places with.
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(Color.accentColor, lineWidth: 3)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Color.accentColor.opacity(0.15)))
+                    .overlay(Image(systemName: "arrow.left.arrow.right").font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Color.accentColor))
+            } else {
+                Capsule().fill(Color.accentColor)
+            }
+        }
+        .shadow(color: .accentColor.opacity(0.8), radius: 4)
+        .frame(width: rect.width, height: rect.height)
+        .offset(x: rect.minX, y: rect.minY)
+        .allowsHitTesting(false)
     }
 
     private var indicatorRect: CGRect {
         switch target {
+        case .swap(let kind):
+            guard let c = columns.firstIndex(where: { $0.contains(kind) }),
+                  let r = columns[c].firstIndex(of: kind) else { return .zero }
+            return frames[c][r]
         case .newColumn(let index):
             let x: CGFloat
             if frames.isEmpty { x = 0 }
@@ -146,9 +161,25 @@ struct EditOverlay: View {
             .gesture(moveGesture)
             .accessibilityLabel("Drag to move \(kind.title)")
 
-            // Top-right: remove.
+            // Top: arrows to move without dragging, and remove.
             VStack {
-                HStack {
+                HStack(spacing: 2) {
+                    if columns.count > 1 {
+                        arrow("chevron.left", "Move \(kind.title) left", enabled: column > 0) {
+                            settings.widgets.moveColumn(containing: kind, by: -1)
+                        }
+                        arrow("chevron.right", "Move \(kind.title) right", enabled: column < columns.count - 1) {
+                            settings.widgets.moveColumn(containing: kind, by: 1)
+                        }
+                    }
+                    if columns[column].count > 1 {
+                        arrow("chevron.up", "Move \(kind.title) up", enabled: row > 0) {
+                            settings.widgets.moveInStack(kind, by: -1)
+                        }
+                        arrow("chevron.down", "Move \(kind.title) down", enabled: row < columns[column].count - 1) {
+                            settings.widgets.moveInStack(kind, by: 1)
+                        }
+                    }
                     Spacer()
                     Button { settings.widgets.remove(kind, from: .panel) } label: {
                         Image(systemName: "xmark.circle.fill").font(.system(size: 14))
@@ -188,6 +219,18 @@ struct EditOverlay: View {
                 }
             }
         }
+    }
+
+    private func arrow(_ symbol: String, _ label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.system(size: 9, weight: .bold))
+                .frame(width: 18, height: 18)
+                .background(Circle().fill(Color.white.opacity(enabled ? 0.25 : 0.08)))
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .help(label)
+        .accessibilityLabel(label)
     }
 
     private func handle(width: CGFloat, height: CGFloat, cursor: NSCursor) -> some View {

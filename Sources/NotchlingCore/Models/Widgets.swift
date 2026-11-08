@@ -247,9 +247,11 @@ public enum PanelLayout {
         }
     }
 
-    /// What dropping `dragging` at `point` would do. The outer fifth of a column, or the gap
-    /// between columns, makes a new column; elsewhere it stacks above or below the card under
-    /// the pointer, depending on which half. Nil means "put it back where it was".
+    /// What dropping `dragging` at `point` would do:
+    /// - the outer fifth of a column, or the gap between columns: a new column there;
+    /// - the top or bottom quarter of a card: stack above or below it;
+    /// - the middle of a card: swap with it, the most common intent, so it gets the biggest zone.
+    /// Nil means "put it back where it was".
     public static func dropTarget(at point: CGPoint, frames: [[CGRect]], columns: [[WidgetKind]],
                                   dragging: WidgetKind) -> WidgetLayout.PanelDrop? {
         guard !frames.isEmpty else { return .newColumn(at: 0) }
@@ -263,7 +265,11 @@ public enum PanelLayout {
             let row = column.lastIndex { point.y >= $0.minY } ?? 0
             let card = columns[c][row]
             if card == dragging { return nil }
-            return point.y < column[row].midY ? .above(card) : .below(card)
+            let frame = column[row]
+            let band = frame.height * 0.25
+            if point.y < frame.minY + band { return .above(card) }
+            if point.y > frame.maxY - band { return .below(card) }
+            return .swap(card)
         }
         return .newColumn(at: frames.count)
     }
@@ -355,12 +361,15 @@ public struct WidgetLayout: Equatable, Sendable {
         case newColumn(at: Int)
         case above(WidgetKind)
         case below(WidgetKind)
+        /// Trade places with that card (each keeps its own width and height).
+        case swap(WidgetKind)
     }
 
     /// Moves a panel card to `target`. Returns false (and changes nothing) if that would
     /// break a limit, e.g. a full column or too many columns.
     @discardableResult
     public mutating func drop(_ kind: WidgetKind, at target: PanelDrop) -> Bool {
+        if case .swap(let other) = target { return swap(kind, other) }
         var columns = panelColumns
         guard let from = columns.firstIndex(where: { $0.contains(kind) }) else { return false }
         let wasAlone = columns[from].count == 1
@@ -372,12 +381,45 @@ public struct WidgetLayout: Equatable, Sendable {
             if wasAlone && from < index { index -= 1 }
             guard columns.count < Self.maxColumns else { return false }
             columns.insert([kind], at: min(max(index, 0), columns.count))
+        case .swap:
+            return false   // handled above
         case .above(let other), .below(let other):
             guard other != kind, let column = columns.firstIndex(where: { $0.contains(other) }),
                   columns[column].count < Self.maxStack,
                   let row = columns[column].firstIndex(of: other) else { return false }
             columns[column].insert(kind, at: target == .above(other) ? row : row + 1)
         }
+        panelColumns = columns
+        return true
+    }
+
+    /// Two cards trade places. Column shapes don't change, so no limit can be broken.
+    @discardableResult
+    public mutating func swap(_ first: WidgetKind, _ second: WidgetKind) -> Bool {
+        guard first != second, panel.contains(first), panel.contains(second) else { return false }
+        panelColumns = panelColumns.map { $0.map { $0 == first ? second : $0 == second ? first : $0 } }
+        return true
+    }
+
+    /// Moves the whole column holding `kind` one place left (-1) or right (+1).
+    @discardableResult
+    public mutating func moveColumn(containing kind: WidgetKind, by offset: Int) -> Bool {
+        var columns = panelColumns
+        guard let from = columns.firstIndex(where: { $0.contains(kind) }) else { return false }
+        let to = from + offset
+        guard columns.indices.contains(to) else { return false }
+        columns.swapAt(from, to)
+        panelColumns = columns
+        return true
+    }
+
+    /// Moves a card one place up (-1) or down (+1) within its stack.
+    @discardableResult
+    public mutating func moveInStack(_ kind: WidgetKind, by offset: Int) -> Bool {
+        var columns = panelColumns
+        guard let c = columns.firstIndex(where: { $0.contains(kind) }),
+              let r = columns[c].firstIndex(of: kind), columns[c].indices.contains(r + offset) else { return false }
+        columns[c].swapAt(r, r + offset)
         panelColumns = columns
         return true
     }
