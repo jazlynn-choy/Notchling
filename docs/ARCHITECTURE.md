@@ -119,6 +119,15 @@ Weather comes from Open-Meteo (no key, no account), is cached for 20 minutes, an
 ### 14. Card sizes are weights
 Panel cards are Small, Medium or Large, which are weights (1, 1.6, 2.5) rather than fixed widths. `PanelLayout.widths` splits whatever width the panel has, with a minimum so a small card next to three large ones stays usable. It's a pure function, so it's tested without SwiftUI.
 
+### 15. Claude Code status through hooks
+Claude Code runs configured commands on lifecycle events (`SessionStart`, `PreToolUse`, `Notification`, `Stop`…), passing the event as JSON on stdin. Notchling installs one small `sh` script as that command:
+
+- **It must never hurt Claude Code.** It uses only base-system tools (`plutil` reads and edits JSON), prints nothing, has a 5-second timeout, and always exits 0. A test runs the real script and checks this.
+- **Atomic, one file per session.** It writes to a temp file and `mv`s it to `<session_id>.json`, so the app never reads half a file. The session ID is filtered to `[A-Za-z0-9-]`, so a crafted ID like `../../x` can't write outside the folder (tested).
+- **Privacy.** Prompts, tool output and file contents (`prompt`, `tool_response`, `tool_input.content`, edit strings) are deleted before the event is saved (tested).
+- **Reading.** The app reads that folder once a second, only while a Claude Code widget is shown. Ended sessions are removed, files older than a day are cleaned up, and a "working" session silent for 30 minutes is shown as quiet, in case Claude was killed without a `Stop`.
+- **Installing into someone's settings.** The merge adds Notchling's entries next to any existing hooks, is idempotent, and is reversed exactly by Disconnect. It refuses to touch a settings file that isn't valid JSON, and keeps a one-time backup. All of this is tested on temp files.
+
 ## Known limitations
 
 - One display: the notch screen, or the main screen with a virtual notch.

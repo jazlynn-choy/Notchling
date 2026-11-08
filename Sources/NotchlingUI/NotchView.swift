@@ -6,9 +6,9 @@ import SwiftUI
 public struct NotchView: View {
     @ObservedObject var model: NotchModel
     @EnvironmentObject var settings: NotchSettings
-    let openSettings: () -> Void
+    let openSettings: @MainActor @Sendable () -> Void
 
-    public init(model: NotchModel, openSettings: @escaping () -> Void) {
+    public init(model: NotchModel, openSettings: @escaping @MainActor @Sendable () -> Void) {
         self.model = model
         self.openSettings = openSettings
     }
@@ -39,6 +39,7 @@ public struct NotchView: View {
         .animation(.easeOut(duration: 0.2), value: settings.wingWidth)
         .foregroundStyle(.white)
         .environment(\.colorScheme, .dark)
+        .environment(\.openNotchSettings, OpenNotchSettings(action: openSettings))
     }
 }
 
@@ -75,7 +76,7 @@ struct CollapsedView: View {
 struct ExpandedView: View {
     @ObservedObject var model: NotchModel
     let geometry: NotchGeometry
-    let openSettings: () -> Void
+    let openSettings: @MainActor @Sendable () -> Void
     @EnvironmentObject var settings: NotchSettings
 
     var body: some View {

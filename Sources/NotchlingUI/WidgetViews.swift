@@ -64,8 +64,10 @@ struct WingWidgetView: View {
             WorldClockWing(now: model.now, wingWidth: wingWidth)
         case .countdown:
             CountdownWing(now: model.now)
+        case .agent:
+            AgentWing(now: model.now, wingWidth: wingWidth)
         case .musicCard, .remindersCard, .dayCard, .focusCard, .calendarCard, .weatherCard, .worldClockCard,
-             .countdownCard, .notesCard:
+             .countdownCard, .notesCard, .agentCard:
             EmptyView()   // panel-only; `WidgetLayout` never puts these in a wing
         }
     }
@@ -103,6 +105,7 @@ struct PanelWidgetView: View {
         case .worldClockCard: WorldClockCard(now: model.now)
         case .countdownCard: CountdownCard(now: model.now)
         case .notesCard: NotesCard()
+        case .agentCard: AgentCard(now: model.now)
         default: EmptyView()   // wing-only
         }
     }

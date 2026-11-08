@@ -42,6 +42,7 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
     case weather = "weather"
     case worldClock = "worldClock"
     case countdown = "countdown"
+    case agent = "agent"
     // Panel widgets
     case musicCard = "musicCard"
     case remindersCard = "remindersCard"
@@ -52,6 +53,7 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
     case worldClockCard = "worldClockCard"
     case countdownCard = "countdownCard"
     case notesCard = "notesCard"
+    case agentCard = "agentCard"
 
     public var id: String { rawValue }
 
@@ -74,6 +76,8 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
         case .dayCard: return "Today"
         case .calendarCard: return "Calendar"
         case .notesCard: return "Notes"
+        case .agent: return "Claude Code"
+        case .agentCard: return "Claude Code sessions"
         }
     }
 
@@ -99,6 +103,8 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
         case .worldClockCard: return "The time in up to three cities"
         case .countdownCard: return "A big day count to the date you choose"
         case .notesCard: return "A scratchpad that's saved as you type"
+        case .agent: return "What Claude Code is doing, and when it needs you"
+        case .agentCard: return "Every Claude Code session: working, waiting or done"
         }
     }
 
@@ -118,16 +124,17 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
         case .worldClock, .worldClockCard: return "globe"
         case .countdown, .countdownCard: return "hourglass"
         case .notesCard: return "note.text"
+        case .agent, .agentCard: return "sparkle"
         }
     }
 
     public func fits(_ slot: WidgetSlot) -> Bool {
         switch self {
         case .nowPlaying, .nowPlayingOrDate, .date, .time, .battery, .reminderCount, .focusTimer, .nextEvent,
-             .weather, .worldClock, .countdown:
+             .weather, .worldClock, .countdown, .agent:
             return slot.isWing
         case .musicCard, .remindersCard, .dayCard, .focusCard, .calendarCard, .weatherCard, .worldClockCard,
-             .countdownCard, .notesCard:
+             .countdownCard, .notesCard, .agentCard:
             return slot == .panel
         }
     }
@@ -135,7 +142,7 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
     /// How wide a panel card starts out. Users can change it per card.
     public var defaultCardSize: CardSize {
         switch self {
-        case .remindersCard, .calendarCard: return .large
+        case .remindersCard, .calendarCard, .agentCard: return .large
         case .musicCard, .notesCard, .worldClockCard: return .medium
         default: return .small
         }
@@ -149,6 +156,9 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
 
     /// Whether this widget needs the weather, so the app only calls the network when needed.
     public var usesWeather: Bool { self == .weather || self == .weatherCard }
+
+    /// Whether this widget shows Claude Code activity, so the app only watches for it when needed.
+    public var usesAgent: Bool { self == .agent || self == .agentCard }
 }
 
 /// How much of the panel's width a card takes, relative to the other cards.

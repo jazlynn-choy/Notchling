@@ -25,6 +25,7 @@ public struct SettingsView: View {
 
             ForEach(WidgetSlot.allCases) { WidgetSlotSection(slot: $0) }
 
+            ClaudeCodeSettingsSection()
             MusicSettingsSection()
             if uses(.weather, .weatherCard) { WeatherSettingsSection() }
             if uses(.worldClock, .worldClockCard) { WorldClockSettingsSection() }
@@ -305,6 +306,48 @@ struct WorldClockSettingsSection: View {
             Text("World clocks")
         } footer: {
             Text("Up to \(WorldClock.maxCities) cities. The wing shows the first one.")
+        }
+    }
+}
+
+struct ClaudeCodeSettingsSection: View {
+    @EnvironmentObject var settings: NotchSettings
+    @EnvironmentObject var setup: ClaudeHookSetup
+
+    var body: some View {
+        Section {
+            HStack {
+                if setup.isInstalled {
+                    Label("Connected", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    Spacer()
+                    Button("Disconnect") { setup.uninstall() }
+                } else {
+                    Text("Show what Claude Code is doing, and when it needs you.")
+                    Spacer()
+                    Button("Connect") { connect() }.buttonStyle(.borderedProminent)
+                }
+            }
+            if let error = setup.lastError {
+                Text(error).font(.caption).foregroundStyle(.red)
+            }
+            Toggle("Chime when Claude needs you or finishes", isOn: $settings.agentChime)
+        } header: {
+            Text("Claude Code")
+        } footer: {
+            Text("Connect adds a small hook to ~/.claude/settings.json (your existing settings are kept, with a "
+                 + "backup). It records only which tool Claude is using and in which folder, never your prompts "
+                 + "or file contents. New Claude Code sessions pick it up; restart open ones.")
+        }
+    }
+
+    /// Connecting also puts the agent widget beside the notch, so it's visible straight away.
+    private func connect() {
+        setup.install()
+        guard setup.isInstalled, !settings.widgets.allWidgets.contains(where: \.usesAgent) else { return }
+        if settings.widgets.addable(to: .leftWing).contains(.agent) {
+            settings.widgets.add(.agent, to: .leftWing)
+        } else {
+            settings.widgets.add(.agent, to: .rightWing)
         }
     }
 }

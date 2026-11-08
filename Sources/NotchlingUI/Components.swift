@@ -4,7 +4,7 @@ import SwiftUI
 struct IconButton: View {
     let symbol: String
     let label: String
-    let action: () -> Void
+    let action: @MainActor @Sendable () -> Void
 
     var body: some View {
         Button(action: action) {
@@ -23,7 +23,7 @@ struct ControlButton: View {
     let symbol: String
     let label: String
     var size: CGFloat = 12
-    let action: () -> Void
+    let action: @MainActor @Sendable () -> Void
 
     var body: some View {
         Button(action: action) {
@@ -99,5 +99,22 @@ struct EqualizerBars: View {
             }
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// Lets any view open the Settings window without threading a closure through every layer.
+struct OpenNotchSettings: Sendable {
+    let action: @MainActor @Sendable () -> Void
+    @MainActor func callAsFunction() { action() }
+}
+
+private struct OpenNotchSettingsKey: EnvironmentKey {
+    static let defaultValue = OpenNotchSettings {}
+}
+
+extension EnvironmentValues {
+    var openNotchSettings: OpenNotchSettings {
+        get { self[OpenNotchSettingsKey.self] }
+        set { self[OpenNotchSettingsKey.self] = newValue }
     }
 }

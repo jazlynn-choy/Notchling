@@ -28,6 +28,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         source: settings.musicSource)
     private let weather = WeatherStore(provider: OpenMeteoWeatherProvider())
     private let notes = NotesStore()
+    private let hookSetup = ClaudeHookSetup()
+    private lazy var agents = AgentStatusStore(
+        source: DirectoryAgentEventSource(directory: hookSetup.installer.eventsDirectory))
+    private var agentTimer: Timer?
     private var calendarTimer: Timer?
     private var weatherTimer: Timer?
     private var modelSubscriptions = Set<AnyCancellable>()
@@ -71,6 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .environmentObject(search)
             .environmentObject(weather)
             .environmentObject(notes)
+            .environmentObject(agents)
         let host = NSHostingView(rootView: root)
         host.wantsLayer = true
         host.layer?.backgroundColor = .clear
@@ -112,6 +117,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .removeDuplicates()
             .sink { [weak self] enabled in self?.setWeatherEnabled(enabled) }
             .store(in: &subscriptions)
+
+        // Claude Code activity: a cheap directory read once a second, only while a widget shows it.
+        settings.$widgets
+            .map { $0.allWidgets.contains(where: \.usesAgent) }
+            .removeDuplicates()
+            .sink { [weak self] enabled in self?.setAgentWatching(enabled) }
+            .store(in: &subscriptions)
+        agents.onAttention = { [weak self] session in
+            guard let self, settings.agentChime else { return }
+            NSSound(named: session.state == .needsInput ? "Funk" : "Glass")?.play()
+            NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+        }
 
         settings.$musicSource
             .removeDuplicates()
@@ -225,6 +242,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func setAgentWatching(_ enabled: Bool) {
+        agentTimer?.invalidate()
+        agentTimer = nil
+        guard enabled else { return }
+        agents.refresh()
+        agentTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.agents.refresh() }
+        }
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         notes.saveNow()
     }
@@ -250,7 +277,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .environmentObject(reminders)
                 .environmentObject(calendar)
                 .environmentObject(weather)
-                .environmentObject(spotify))
+                .environmentObject(spotify)
+                .environmentObject(hookSetup))
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 720),
                                   styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
             window.title = "Notchling Settings"

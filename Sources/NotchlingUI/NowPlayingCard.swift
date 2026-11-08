@@ -88,6 +88,7 @@ struct NowPlayingCard: View {
 /// Search-as-you-type over the Music library, with a hand-off to Spotify's search.
 struct SongSearchView: View {
     @EnvironmentObject var search: MusicSearch
+    @Environment(\.openNotchSettings) private var openSettings
     @FocusState private var fieldFocused: Bool
 
     var body: some View {
@@ -125,6 +126,14 @@ struct SongSearchView: View {
                     if let error = search.errorMessage {
                         Text(error).font(.system(size: 10)).foregroundStyle(.orange)
                             .fixedSize(horizontal: false, vertical: true)
+                        if search.source == .spotify {
+                            Button("Set up Spotify…") { openSettings() }
+                                .buttonStyle(.plain)
+                                .font(.system(size: 10, weight: .semibold))
+                                .padding(.horizontal, 8).padding(.vertical, 3)
+                                .background(Capsule().fill(Color.green))
+                                .foregroundStyle(.black)
+                        }
                     }
                     if search.hasSearched && search.results.isEmpty {
                         Text("No songs found").font(.system(size: 10)).foregroundStyle(.white.opacity(0.4))

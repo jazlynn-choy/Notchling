@@ -5,8 +5,9 @@ A macOS menu-bar companion that turns the dead space around the MacBook camera n
 - **Collapsed:** slim black "wings" extend the notch and show what's playing (or the date), your open reminders count, the time, and battery.
 - **Hover the notch:** a panel drops down with music controls and your **Apple Reminders**, synced both ways: add or tick off a reminder here and it updates on your iPhone.
 - **Pick your widgets.** Choose what goes on the left of the notch, the right, and in the panel, and in what order:
-  - **Beside the notch:** now playing, date, time, battery, open reminders, focus timer, next calendar event, weather, world clock, countdown
-  - **In the panel (up to 4 cards):** music, Reminders, focus timer, Calendar, weather, world clocks, countdown, notes, a Today tile
+  - **Beside the notch:** Claude Code status, now playing, date, time, battery, open reminders, focus timer, next calendar event, weather, world clock, countdown
+  - **In the panel (up to 4 cards):** Claude Code sessions, music, Reminders, focus timer, Calendar, weather, world clocks, countdown, notes, a Today tile
+- **Claude Code in the notch:** see what each session is doing ("Editing NotchView.swift"), get a chime when it needs your permission or finishes, and see every session in one card.
 - **Size each card:** Small, Medium or Large, and make the whole panel up to 900×420 pt.
 - **Music, Spotify first:** play/pause/skip, **loop**, and **search all of Spotify** to play any song (after a one-time sign-in, below). Can search your Apple Music library instead.
 - **Focus timer:** 5/15/25/50-minute sessions with a progress ring, a chime when done, and the time left shown beside the notch.
@@ -29,6 +30,10 @@ make lint     # SwiftLint (needs `brew install swiftlint`)
 ```
 
 On first use, macOS asks for permission to access Reminders and Calendar and to control Music/Spotify.
+
+### Connect Claude Code
+
+Settings → Claude Code → **Connect**. That adds a hook to `~/.claude/settings.json`: a small script Claude Code runs on each event, which saves the session's latest status for the notch. Your other settings and hooks are kept, and the original file is backed up as `settings.json.before-notchling`. Only the event type, tool name, file or command and folder are kept, never your prompts or file contents. Restart open Claude Code sessions to pick it up. **Disconnect** removes exactly what was added.
 
 ### Connect Spotify (for song search)
 
@@ -69,7 +74,7 @@ The architecture, and why it's built this way, is written up in [docs/ARCHITECTU
 
 ## Testing
 
-The core module is covered by 123 tests: layout geometry, the widget layout and its migration, card sizing, the focus timer, calendar labels, music search, the Spotify sign-in (including a real loopback-server test), weather parsing and caching, world clocks, date labels, sorting, AppleScript/IOKit parsing, settings persistence, and the reminders sync behaviour. The sync tests run against `FakeRemindersProvider`, so they need no permissions and touch none of your real data.
+The core module is covered by 142 tests: the Claude Code hook script (run for real against sample events) and its settings installer, layout geometry, the widget layout and its migration, card sizing, the focus timer, calendar labels, music search, the Spotify sign-in (including a real loopback-server test), weather parsing and caching, world clocks, date labels, sorting, AppleScript/IOKit parsing, settings persistence, and the reminders sync behaviour. The sync tests run against `FakeRemindersProvider`, so they need no permissions and touch none of your real data.
 
 ```bash
 make test
