@@ -1,17 +1,24 @@
+import NotchlingCore
 import SwiftUI
 
-struct SettingsView: View {
+/// The Settings window. Expects `NotchSettings` and `RemindersStore` in the environment.
+public struct SettingsView: View {
     @EnvironmentObject var settings: NotchSettings
     @EnvironmentObject var reminders: RemindersStore
 
-    var body: some View {
+    public init() {}
+
+    public var body: some View {
         Form {
             Section("Size") {
-                LabeledSlider(title: "Bar beside the notch", value: $settings.wingWidth, range: 0...160,
+                LabeledSlider(title: "Bar beside the notch", value: $settings.wingWidth,
+                              range: NotchSettings.wingRange,
                               hint: "0 hides it, so only the real notch shows")
-                LabeledSlider(title: "Panel width", value: $settings.panelWidth, range: 340...640)
-                LabeledSlider(title: "Panel height", value: $settings.panelHeight, range: 160...300)
-                Button("Reset sizes") { settings.resetLayout() }
+                LabeledSlider(title: "Panel width", value: $settings.panelWidth,
+                              range: NotchSettings.panelWidthRange)
+                LabeledSlider(title: "Panel height", value: $settings.panelHeight,
+                              range: NotchSettings.panelHeightRange)
+                Button("Reset sizes") { settings.resetSizes() }
             }
 
             Section("Bar beside the notch") {
@@ -31,22 +38,21 @@ struct SettingsView: View {
                         ForEach(reminders.lists) { Text($0.title).tag($0.id) }
                     }
                 } else {
-                    Button("Connect to Reminders") { reminders.requestAccess() }
+                    Button("Connect to Reminders") { Task { await reminders.requestAccess() } }
                 }
             }
 
             Section("General") {
                 Toggle("Haptic tap when the panel opens", isOn: $settings.haptics)
                 Toggle("Open at login", isOn: $settings.launchAtLogin)
-                if let err = settings.loginItemError {
-                    Text(err).font(.caption).foregroundColor(.red)
+                if let error = settings.loginItemError {
+                    Text(error).font(.caption).foregroundStyle(.red)
                 }
             }
         }
         .formStyle(.grouped)
         .frame(width: 420)
         .fixedSize(horizontal: false, vertical: true)
-        .onChange(of: settings.reminderListID) { _ in reminders.reload() }
     }
 }
 
@@ -54,17 +60,18 @@ struct LabeledSlider: View {
     let title: String
     @Binding var value: Double
     let range: ClosedRange<Double>
-    var hint: String? = nil
+    var hint: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
                 Text(title)
                 Spacer()
-                Text("\(Int(value)) pt").monospacedDigit().foregroundColor(.secondary)
+                Text("\(Int(value)) pt").monospacedDigit().foregroundStyle(.secondary)
             }
             Slider(value: $value, in: range, step: 2)
-            if let hint { Text(hint).font(.caption).foregroundColor(.secondary) }
+                .accessibilityLabel(title)
+            if let hint { Text(hint).font(.caption).foregroundStyle(.secondary) }
         }
     }
 }
