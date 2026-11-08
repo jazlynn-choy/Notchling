@@ -1,8 +1,13 @@
 #!/bin/zsh
 # Builds a release binary and wraps it in Notchling.app.
 #
-#   scripts/bundle.sh                 # ad-hoc signed, for running locally
+#   scripts/bundle.sh       # signed with the local "Notchling Dev" certificate if you have one
 #   SIGN_IDENTITY="Developer ID Application: …" scripts/bundle.sh   # for distribution
+#
+# Why the local certificate matters: macOS ties privacy permissions (Reminders, Calendar,
+# Automation) to the app's signature. An ad-hoc signature changes on every build, so each
+# rebuild looks like a new app and permissions have to be granted again. Signing with the
+# same certificate every time keeps them. See "Keep permissions between builds" in the README.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -19,9 +24,14 @@ mkdir -p "$APP/Contents/MacOS"
 cp "$BIN" "$APP/Contents/MacOS/Notchling"
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" Resources/Info.plist > "$APP/Contents/Info.plist"
 
+DEV_IDENTITY="Notchling Dev"
 if [[ -n "${SIGN_IDENTITY:-}" ]]; then
     codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP"
+elif security find-certificate -c "$DEV_IDENTITY" >/dev/null 2>&1; then
+    codesign --force --timestamp=none --sign "$DEV_IDENTITY" "$APP"
 else
     codesign --force --sign - "$APP"
+    echo "warning: ad-hoc signed, so macOS will ask for permissions again after every build." >&2
+    echo "         Create a \"$DEV_IDENTITY\" certificate once to fix that (see README)." >&2
 fi
 echo "Built $APP (v$VERSION, build $BUILD)"

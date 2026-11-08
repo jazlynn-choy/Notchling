@@ -15,7 +15,7 @@ public final class EventKitRemindersProvider: RemindersProviding, @unchecked Sen
         if let observer { NotificationCenter.default.removeObserver(observer) }
     }
 
-    public func authorizationStatus() -> RemindersAccess {
+    public func authorizationStatus() -> AccessStatus {
         switch EKEventStore.authorizationStatus(for: .reminder) {
         case .fullAccess: return .granted
         case .notDetermined: return .notDetermined

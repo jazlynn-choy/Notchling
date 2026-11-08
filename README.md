@@ -4,7 +4,12 @@ A macOS menu-bar companion that turns the dead space around the MacBook camera n
 
 - **Collapsed:** slim black "wings" extend the notch and show what's playing (or the date), your open reminders count, the time, and battery.
 - **Hover the notch:** a panel drops down with music controls and your **Apple Reminders**, synced both ways: add or tick off a reminder here and it updates on your iPhone.
-- **Pick your widgets.** Choose what goes on the left of the notch, the right, and in the panel, and in what order: now playing, date, time, battery, reminders count, music controls, Reminders, and a Today calendar tile.
+- **Pick your widgets.** Choose what goes on the left of the notch, the right, and in the panel, and in what order:
+  - **Beside the notch:** now playing, date, time, battery, open reminders, focus timer, next calendar event
+  - **In the panel:** music, Reminders, focus timer, Calendar, a Today tile
+- **Music:** play/pause/skip, **loop** (song or playlist), and **search your Music library** to play a song. Songs outside your library open in Spotify's search.
+- **Focus timer:** 5/15/25/50-minute sessions with a progress ring, a chime when done, and the time left shown beside the notch.
+- **Calendar:** your next event ("Standup 12m") beside the notch, and the rest of today in the panel.
 - **Everything else is adjustable** in Settings: wing width (down to zero), panel size, which Reminders list, haptics, and open at login.
 
 <!-- TODO: add a screenshot or GIF here — docs/demo.gif -->
@@ -22,7 +27,17 @@ make test     # unit tests
 make lint     # SwiftLint (needs `brew install swiftlint`)
 ```
 
-On first use, macOS asks for permission to access Reminders and to control Music/Spotify.
+On first use, macOS asks for permission to access Reminders and Calendar and to control Music/Spotify.
+
+### Keep permissions between builds
+
+macOS remembers permissions per app *signature*. Without a certificate, each build gets a new throwaway signature, so macOS treats every rebuild as a new app and asks again. Create a local signing certificate once and `make run` will use it automatically:
+
+1. Open **Keychain Access** → menu **Keychain Access → Certificate Assistant → Create a Certificate…**
+2. Name: `Notchling Dev` · Identity Type: **Self Signed Root** · Certificate Type: **Code Signing** → **Create**
+3. Run `make run` and grant permissions one last time. They'll stick from then on.
+
+The certificate only lives in your keychain and is only good for apps on your own Mac.
 
 ## Project layout
 
@@ -43,7 +58,7 @@ The architecture, and why it's built this way, is written up in [docs/ARCHITECTU
 
 ## Testing
 
-The core module is covered by 53 unit tests: layout geometry, the widget layout and its migration, date labels, sorting, AppleScript/IOKit parsing, settings persistence, and the reminders sync behaviour. The sync tests run against `FakeRemindersProvider`, so they need no permissions and touch none of your real data.
+The core module is covered by 78 unit tests: layout geometry, the widget layout and its migration, the focus timer, calendar labels, music search, date labels, sorting, AppleScript/IOKit parsing, settings persistence, and the reminders sync behaviour. The sync tests run against `FakeRemindersProvider`, so they need no permissions and touch none of your real data.
 
 ```bash
 make test
@@ -54,6 +69,7 @@ make test
 - [ ] Screenshot / demo GIF in this README
 - [ ] Developer ID signing, notarization and a `.dmg` release in CI
 - [ ] Auto-updates (Sparkle)
+- [ ] Play any song (Apple Music catalog via MusicKit, or Spotify Web API with sign-in)
 - [ ] Multiple displays: follow the active screen
 - [ ] Hide automatically over full-screen video
 - [ ] Snapshot tests for the SwiftUI views

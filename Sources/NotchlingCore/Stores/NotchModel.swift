@@ -60,6 +60,17 @@ public final class NotchModel: ObservableObject {
         }
     }
 
+    /// Steps the loop setting off → all → one (Music) or off ↔ all (Spotify). Updates the UI
+    /// right away; the next poll confirms what the player actually did.
+    public func cycleRepeat() {
+        guard var current = track else { return }
+        let mode = current.repeatMode.next(for: current.app)
+        current.repeatMode = mode
+        track = current
+        let media = media
+        Task { await media.setRepeat(mode, for: current.app) }
+    }
+
     private func repeating(every interval: Duration,
                            _ body: @escaping @MainActor (NotchModel) async -> Void) -> Task<Void, Never> {
         Task { [weak self] in

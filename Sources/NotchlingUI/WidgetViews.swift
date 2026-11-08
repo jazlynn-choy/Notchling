@@ -9,6 +9,8 @@ struct WingWidgetView: View {
     /// Room available, so text-heavy widgets can drop detail when the wing is narrow.
     let wingWidth: CGFloat
     @EnvironmentObject var reminders: RemindersStore
+    @EnvironmentObject var focus: FocusTimer
+    @EnvironmentObject var calendar: CalendarStore
 
     var body: some View {
         switch kind {
@@ -29,7 +31,34 @@ struct WingWidgetView: View {
                 CountBadge(count: reminders.openCount)
                     .accessibilityLabel("\(reminders.openCount) open reminders")
             }
-        case .musicCard, .remindersCard, .dayCard:
+        case .focusTimer:
+            if focus.isActive || focus.state == .finished {
+                HStack(spacing: 3) {
+                    Image(systemName: focus.state == .finished ? "checkmark.circle.fill" : "timer")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(focus.isRunning ? Color.orange : Color.white.opacity(0.6))
+                    Text(FocusTimer.format(focus.remaining(at: model.now)))
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Focus timer")
+            }
+        case .nextEvent:
+            if let event = calendar.nextEvent(at: model.now) {
+                HStack(spacing: 4) {
+                    Circle().fill(event.color.map(Color.init(rgb:)) ?? .white).frame(width: 6, height: 6)
+                    if wingWidth > 100 {
+                        Text(event.title).font(.system(size: 11, weight: .semibold))
+                    }
+                    Text(EventTimeLabel.compact(for: event, now: model.now))
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .fixedSize()
+                }
+                .accessibilityElement(children: .combine)
+            }
+        case .musicCard, .remindersCard, .dayCard, .focusCard, .calendarCard:
             EmptyView()   // panel-only; `WidgetLayout` never puts these in a wing
         }
     }
@@ -61,6 +90,8 @@ struct PanelWidgetView: View {
         case .musicCard: NowPlayingCard(model: model)
         case .remindersCard: RemindersCard()
         case .dayCard: DayCard(now: model.now)
+        case .focusCard: FocusCard(now: model.now)
+        case .calendarCard: CalendarCard(now: model.now)
         default: EmptyView()   // wing-only
         }
     }
@@ -90,4 +121,24 @@ struct DayCard: View {
         .background(RoundedRectangle(cornerRadius: 14).fill(Color.white.opacity(0.06)))
         .accessibilityElement(children: .combine)
     }
+}
+
+extension Color {
+    init(rgb: CalendarEvent.RGB) {
+        self.init(.sRGB, red: rgb.red, green: rgb.green, blue: rgb.blue)
+    }
+}
+
+/// The background every panel card shares.
+struct CardBackground: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(10)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Color.white.opacity(0.06)))
+    }
+}
+
+extension View {
+    func cardStyle() -> some View { modifier(CardBackground()) }
 }

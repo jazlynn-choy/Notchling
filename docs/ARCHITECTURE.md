@@ -95,6 +95,15 @@ Failed fetches or saves set `RemindersStore.lastError`, shown as a warning icon 
 - **Cost follows the layout.** If no widget shows music, the app stops running AppleScript every 2 seconds.
 - **Adding a widget** takes a `WidgetKind` case (title, symbol, which slot it fits) and one branch in `WidgetViews.swift`. The `everyWidgetFitsExactlyOneKindOfSlot` test catches a case that was half added.
 
+### 9. Time-based features store dates, not counters
+The focus timer keeps the *date it ends*, not a seconds-left counter that ticks down. If the Mac sleeps or a tick runs late, the remaining time is still exact, because it's always worked out as `end − now`. The clock is injected, so tests move time forward by hand instead of waiting. Calendar labels take `now`, a `Calendar` and a `Locale`, so they're tested in a fixed time zone. Those tests also caught that macOS formats "6:00 PM" with a narrow no-break space.
+
+### 10. Search is safe to type anything into
+The song search sends what you type to AppleScript as an *argument* (`on run argv`), never pasted into the script source, so quotes or backslashes can't change what the script does. Typing is debounced, and each keystroke cancels the previous search, so a slow result for "ta" can't overwrite the results for "taylor" (tested). Playing songs outside your library would need MusicKit or the Spotify Web API, both with accounts and keys, so those hand off to Spotify's own search instead.
+
+### 11. Permissions and signing
+macOS ties privacy permissions to an app's code signature. `scripts/bundle.sh` signs with a stable local `Notchling Dev` certificate when there is one, so permissions survive rebuilds, and warns when it has to fall back to ad hoc signing.
+
 ## Known limitations
 
 - One display: the notch screen, or the main screen with a virtual notch.

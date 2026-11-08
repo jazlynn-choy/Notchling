@@ -14,6 +14,8 @@
     <key>NSHumanReadableCopyright</key><string>Notchling</string>
     <key>NSRemindersFullAccessUsageDescription</key><string>Notchling shows your reminders in the notch and lets you add and tick them off.</string>
     <key>NSRemindersUsageDescription</key><string>Notchling shows your reminders in the notch and lets you add and tick them off.</string>
-    <key>NSAppleEventsUsageDescription</key><string>Notchling shows and controls what's playing in Music or Spotify.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key><string>Notchling shows your next event and the rest of today's calendar in the notch.</string>
+    <key>NSCalendarsUsageDescription</key><string>Notchling shows your next event and the rest of today's calendar in the notch.</string>
+    <key>NSAppleEventsUsageDescription</key><string>Notchling shows and controls what's playing in Music or Spotify, and plays songs you search for.</string>
 </dict>
 </plist>

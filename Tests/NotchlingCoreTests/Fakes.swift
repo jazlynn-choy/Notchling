@@ -4,7 +4,7 @@ import Foundation
 /// In-memory stand-in for Apple Reminders. `@unchecked Sendable` is fine here:
 /// tests drive it from the main actor only.
 final class FakeRemindersProvider: RemindersProviding, @unchecked Sendable {
-    var access: RemindersAccess = .granted
+    var access: AccessStatus = .granted
     var grantOnRequest = true
     var reminderLists = [ReminderList(id: "home", title: "Home"), ReminderList(id: "work", title: "Work")]
     var reminders: [String: [Todo]] = [:]   // listID ("" = default) -> items
@@ -13,7 +13,7 @@ final class FakeRemindersProvider: RemindersProviding, @unchecked Sendable {
     var failFetch = false
     private var onChange: (@Sendable () -> Void)?
 
-    func authorizationStatus() -> RemindersAccess { access }
+    func authorizationStatus() -> AccessStatus { access }
 
     func requestAccess() async -> Bool {
         access = grantOnRequest ? .granted : .denied
@@ -44,6 +44,51 @@ final class FakeRemindersProvider: RemindersProviding, @unchecked Sendable {
 
     /// Simulates an edit made in the Reminders app or on another device.
     func simulateExternalChange() { onChange?() }
+}
+
+/// Records what the app asked the player to do. Tests drive it from the main actor only.
+final class FakeMediaProvider: MediaProviding, @unchecked Sendable {
+    var track: Track?
+    var library: [SongResult] = []
+    var searches: [String] = []
+    var played: [SongResult] = []
+    var repeatRequests: [RepeatMode] = []
+    var spotifySearches: [String] = []
+    var isSpotifyInstalled = true
+
+    func nowPlaying() async -> Track? { track }
+    func send(_ command: MediaCommand, to app: MediaApp) async {}
+    func setRepeat(_ mode: RepeatMode, for app: MediaApp) async { repeatRequests.append(mode) }
+
+    func searchLibrary(_ query: String, limit: Int) async -> [SongResult] {
+        searches.append(query)
+        let matches = library.filter { $0.title.localizedCaseInsensitiveContains(query) }
+        return Array(matches.prefix(limit))
+    }
+
+    func play(_ song: SongResult) async { played.append(song) }
+    func openSpotifySearch(_ query: String) async { spotifySearches.append(query) }
+}
+
+struct FakePowerProvider: PowerProviding {
+    func read() -> PowerStatus? { nil }
+}
+
+final class FakeCalendarProvider: CalendarProviding, @unchecked Sendable {
+    var access: AccessStatus = .granted
+    var events: [CalendarEvent] = []
+    var requestedRanges: [(Date, Date)] = []
+
+    func authorizationStatus() -> AccessStatus { access }
+    func requestAccess() async -> Bool {
+        access = .granted
+        return true
+    }
+    func events(from start: Date, to end: Date) async -> [CalendarEvent] {
+        requestedRanges.append((start, end))
+        return events.filter { $0.end > start && $0.start < end }
+    }
+    func observeChanges(_ onChange: @escaping @Sendable () -> Void) {}
 }
 
 struct FakeLoginItem: LoginItemManaging {

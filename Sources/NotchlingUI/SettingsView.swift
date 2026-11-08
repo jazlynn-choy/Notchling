@@ -5,6 +5,7 @@ import SwiftUI
 public struct SettingsView: View {
     @EnvironmentObject var settings: NotchSettings
     @EnvironmentObject var reminders: RemindersStore
+    @EnvironmentObject var calendar: CalendarStore
 
     public init() {}
 
@@ -22,6 +23,18 @@ public struct SettingsView: View {
             }
 
             ForEach(WidgetSlot.allCases) { WidgetSlotSection(slot: $0) }
+
+            Section("Calendar") {
+                switch calendar.access {
+                case .granted:
+                    Label("Connected", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                case .notDetermined:
+                    Button("Connect to Calendar") { Task { await calendar.requestAccess() } }
+                case .denied:
+                    Text("Turned off in System Settings → Privacy & Security → Calendars.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
 
             Section("Reminders") {
                 if reminders.access == .granted {

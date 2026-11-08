@@ -5,7 +5,7 @@ import Foundation
 public final class RemindersStore: ObservableObject {
     @Published public private(set) var items: [Todo] = []
     @Published public private(set) var lists: [ReminderList] = []
-    @Published public private(set) var access: RemindersAccess
+    @Published public private(set) var access: AccessStatus
     @Published public private(set) var lastError: String?
     /// Text in the "add a reminder" field.
     @Published public var draft = ""

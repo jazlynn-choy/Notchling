@@ -10,6 +10,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settings = NotchSettings()
     private lazy var reminders = RemindersStore(provider: EventKitRemindersProvider(),
                                                 listID: settings.selectedListID)
+    private let focus = FocusTimer()
+    private let calendar = CalendarStore(provider: EventKitCalendarProvider())
+    private let media: MediaProviding = AppleScriptMediaProvider()
+    private lazy var search = MusicSearch(media: media)
+    private var calendarTimer: Timer?
+    private var modelSubscriptions = Set<AnyCancellable>()
     private var model: NotchModel!
     private var panel: NotchPanel!
     private var screen: NSScreen!
@@ -22,12 +28,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         screen = NSScreen.withNotch ?? NSScreen.main ?? NSScreen.screens[0]
-        model = NotchModel(notchSize: screen.notchSize, media: AppleScriptMediaProvider(),
-                           power: IOKitPowerProvider())
-        model.start()
+        startModel(notchSize: screen.notchSize)
         buildPanel()
         observe()
         Task { await reminders.reload() }
+    }
+
+    /// (Re)creates the live model and everything that listens to it.
+    private func startModel(notchSize: CGSize) {
+        modelSubscriptions = []
+        model = NotchModel(notchSize: notchSize, media: media, power: IOKitPowerProvider())
+        model.mediaEnabled = settings.widgets.allWidgets.contains(where: \.usesMedia)
+        model.start()
+        // The focus timer checks for "done" on the same 1-second clock the UI uses.
+        model.$now
+            .sink { [weak self] now in self?.focus.tick(now: now) }
+            .store(in: &modelSubscriptions)
     }
 
     private func buildPanel() {
@@ -35,6 +51,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let root = NotchView(model: model, openSettings: { [weak self] in self?.showSettings() })
             .environmentObject(settings)
             .environmentObject(reminders)
+            .environmentObject(focus)
+            .environmentObject(calendar)
+            .environmentObject(search)
         let host = NSHostingView(rootView: root)
         host.wantsLayer = true
         host.layer?.backgroundColor = .clear
@@ -62,6 +81,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self] enabled in self?.model.mediaEnabled = enabled }
             .store(in: &subscriptions)
 
+        // Calendar is only read while a calendar widget is in the layout. A slow timer keeps
+        // "next event" current across midnight; edits arrive through EKEventStoreChanged.
+        settings.$widgets
+            .map { $0.allWidgets.contains(where: \.usesCalendar) }
+            .removeDuplicates()
+            .sink { [weak self] enabled in self?.setCalendarEnabled(enabled) }
+            .store(in: &subscriptions)
+
+        focus.onFinish = {
+            NSSound(named: "Glass")?.play()
+            NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+        }
+
+        // Typing needs the panel to be the key window; a non-activating panel only becomes
+        // key on its own when a text field is clicked, not when search opens from a button.
+        search.$isOpen
+            .removeDuplicates()
+            .sink { [weak self] open in if open { self?.panel.makeKey() } }
+            .store(in: &subscriptions)
+        search.onPlay = { [weak self] in
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(400))
+                await self?.model.refreshMedia()
+            }
+        }
+
         settings.$reminderListID
             .removeDuplicates()
             .sink { [weak self] id in self?.reminders.listID = id.isEmpty ? nil : id }
@@ -80,9 +125,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // A different notch size (e.g. display mode change) needs a fresh model.
             model.stop()
             screen = current
-            model = NotchModel(notchSize: current.notchSize, media: AppleScriptMediaProvider(),
-                               power: IOKitPowerProvider())
-            model.start()
+            startModel(notchSize: current.notchSize)
             buildPanel()
         } else {
             screen = current
@@ -127,11 +170,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task {
                 await model.refreshMedia()
                 await reminders.reload()
+                if calendarTimer != nil { await calendar.reload() }
             }
-        } else if panel.isKeyWindow {
+        } else {
+            search.isOpen = false
+        }
+        if !expanded && panel.isKeyWindow {
             // Hand the keyboard back to whatever app the user was typing in.
             panel.resignKey()
             NSWorkspace.shared.frontmostApplication?.activate()
+        }
+    }
+
+    private func setCalendarEnabled(_ enabled: Bool) {
+        calendarTimer?.invalidate()
+        calendarTimer = nil
+        guard enabled else { return }
+        Task { await calendar.reload() }
+        calendarTimer = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                Task { await self.calendar.reload() }
+            }
         }
     }
 
@@ -140,7 +200,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if settingsWindow == nil {
             let host = NSHostingView(rootView: SettingsView()
                 .environmentObject(settings)
-                .environmentObject(reminders))
+                .environmentObject(reminders)
+                .environmentObject(calendar))
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 440, height: 680),
                                   styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
             window.title = "Notchling Settings"

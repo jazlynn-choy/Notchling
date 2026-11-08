@@ -37,10 +37,14 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
     case time = "time"
     case battery = "battery"
     case reminderCount = "reminderCount"
+    case focusTimer = "focusTimer"
+    case nextEvent = "nextEvent"
     // Panel widgets
     case musicCard = "musicCard"
     case remindersCard = "remindersCard"
     case dayCard = "dayCard"
+    case focusCard = "focusCard"
+    case calendarCard = "calendarCard"
 
     public var id: String { rawValue }
 
@@ -55,6 +59,10 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
         case .musicCard: return "Music controls"
         case .remindersCard: return "Reminders"
         case .dayCard: return "Today"
+        case .focusTimer: return "Focus timer"
+        case .nextEvent: return "Next event"
+        case .focusCard: return "Focus timer"
+        case .calendarCard: return "Calendar"
         }
     }
 
@@ -69,6 +77,10 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
         case .musicCard: return "Song, artist and play controls for Music or Spotify"
         case .remindersCard: return "Your Apple Reminders: tick off or add new ones"
         case .dayCard: return "A calendar tile for today's date"
+        case .focusTimer: return "Time left, while a focus session is running"
+        case .nextEvent: return "Your next meeting and how soon it starts"
+        case .focusCard: return "Start, pause and pick a length for a focus session"
+        case .calendarCard: return "The rest of today's events from Calendar"
         }
     }
 
@@ -82,21 +94,28 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
         case .battery: return "battery.75percent"
         case .reminderCount: return "number.circle"
         case .remindersCard: return "checklist"
+        case .focusTimer, .focusCard: return "timer"
+        case .nextEvent, .calendarCard: return "calendar.badge.clock"
         }
     }
 
     public func fits(_ slot: WidgetSlot) -> Bool {
         switch self {
-        case .nowPlaying, .nowPlayingOrDate, .date, .time, .battery, .reminderCount: return slot.isWing
-        case .musicCard, .remindersCard, .dayCard: return slot == .panel
+        case .nowPlaying, .nowPlayingOrDate, .date, .time, .battery, .reminderCount, .focusTimer, .nextEvent:
+            return slot.isWing
+        case .musicCard, .remindersCard, .dayCard, .focusCard, .calendarCard:
+            return slot == .panel
         }
     }
 
     /// Whether a panel card stretches to fill leftover width (true) or keeps a compact width.
-    public var isFlexible: Bool { self == .remindersCard }
+    public var isFlexible: Bool { self == .remindersCard || self == .calendarCard }
 
     /// Whether this widget needs now-playing information, so polling can stop when none does.
     public var usesMedia: Bool { [.nowPlaying, .nowPlayingOrDate, .musicCard].contains(self) }
+
+    /// Whether this widget reads Calendar, so the app only touches EventKit events when needed.
+    public var usesCalendar: Bool { self == .nextEvent || self == .calendarCard }
 }
 
 /// Which widgets appear in each slot, in display order.
