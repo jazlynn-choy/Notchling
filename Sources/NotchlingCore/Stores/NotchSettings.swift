@@ -15,6 +15,8 @@ public final class NotchSettings: ObservableObject {
         static let countdownTitle = "countdownTitle"
         static let countdownDate = "countdownDate"
         static let agentChime = "agentChime"
+        static let approvalsEnabled = "approvalsEnabled"
+        static let approvalWait = "approvalWait"
         static let haptics = "haptics"
         static let reminderListID = "reminderListID"
     }
@@ -75,6 +77,18 @@ public final class NotchSettings: ObservableObject {
     @Published public var agentChime: Bool {
         didSet { defaults.set(agentChime, forKey: Key.agentChime) }
     }
+    /// Answer Claude Code's permission prompts from the notch.
+    @Published public var approvalsEnabled: Bool {
+        didSet { defaults.set(approvalsEnabled, forKey: Key.approvalsEnabled) }
+    }
+    /// How long the notch waits for an answer before Claude Code asks in the terminal.
+    @Published public var approvalWait: Int {
+        didSet {
+            let clamped = approvalWait.clamped(to: ClaudeApprovals.waitRange)
+            if clamped != approvalWait { approvalWait = clamped; return }
+            defaults.set(approvalWait, forKey: Key.approvalWait)
+        }
+    }
     /// Empty string = the default Reminders list.
     @Published public var reminderListID: String {
         didSet { defaults.set(reminderListID, forKey: Key.reminderListID) }
@@ -92,7 +106,8 @@ public final class NotchSettings: ObservableObject {
             Key.wingWidth: Self.defaultSizes.wing,
             Key.panelWidth: Self.defaultSizes.panelWidth,
             Key.panelHeight: Self.defaultSizes.panelHeight,
-            Key.haptics: true, Key.reminderListID: "", Key.agentChime: true,
+            Key.haptics: true, Key.reminderListID: "", Key.agentChime: true, Key.approvalsEnabled: true,
+            Key.approvalWait: ClaudeApprovals.defaultWait,
         ])
         // Clamp on load so a hand-edited or stale preference can't break the layout.
         wingWidth = defaults.double(forKey: Key.wingWidth).clamped(to: Self.wingRange)
@@ -117,6 +132,8 @@ public final class NotchSettings: ObservableObject {
         haptics = defaults.bool(forKey: Key.haptics)
         reminderListID = defaults.string(forKey: Key.reminderListID) ?? ""
         agentChime = defaults.bool(forKey: Key.agentChime)
+        approvalsEnabled = defaults.bool(forKey: Key.approvalsEnabled)
+        approvalWait = defaults.integer(forKey: Key.approvalWait).clamped(to: ClaudeApprovals.waitRange)
         musicSource = MediaApp(rawValue: defaults.string(forKey: Key.musicSource) ?? "")
             ?? (spotifyInstalled ? .spotify : .music)
         worldClockZones = (defaults.stringArray(forKey: Key.worldClockZones) ?? ["Europe/London", "America/New_York"])

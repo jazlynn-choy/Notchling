@@ -145,6 +145,24 @@ Claude Code runs configured commands on lifecycle events (`SessionStart`, `PreTo
 - **Reading.** The app reads that folder once a second, only while a Claude Code widget is shown. Ended sessions are removed, files older than a day are cleaned up, and a "working" session silent for 30 minutes is shown as quiet, in case Claude was killed without a `Stop`.
 - **Installing into someone's settings.** The merge adds Notchling's entries next to any existing hooks, is idempotent, and is reversed exactly by Disconnect. It refuses to touch a settings file that isn't valid JSON, and keeps a one-time backup. All of this is tested on temp files.
 
+### 18. Approving Claude Code from the notch: fail safe by construction
+Claude Code's `PermissionRequest` hook fires only when it's about to ask you something. Ours writes the request to `approvals/<uuid>.request.json` and polls for `<uuid>.decision` for up to N seconds (10–120, configurable).
+
+- **The default outcome is "no decision".** It applies on timeout, on "Ask in terminal", when Notchling isn't running (checked with `pgrep` before waiting), and when approvals are switched off (a flag file the app owns). Claude Code then asks in the terminal exactly as it would without Notchling. The only way to approve is a click on a request you can see.
+- **The hook's own timeout (150 s) is longer than the longest wait**, so Claude Code never kills it mid-answer.
+- **Files, not sockets.** Both sides already share a folder, there's no port to manage or secure, and a crashed app just means no answer. Answers are written then renamed, so they're never half-read. Request IDs come from `uuidgen` and are checked on both sides, so a crafted file name can't make the app write elsewhere. Every `rm` uses `${var:?}`, so an empty variable stops the script instead of widening a delete.
+- **The panel stays open** while a request is pending, even if the pointer leaves, and quitting the app hands every waiting request straight back to the terminal.
+- **Tested end to end:** the real script runs with a fake `HOME`, and the test plays the app's role through the same channel class. For Allow, Deny and Ask it checks the exact JSON Claude Code receives, that the files are cleaned up, and that a late answer is rejected.
+
+### 19. The `notch` command
+A second executable in the package, sharing a tiny Foundation-only `NotchlingActivity` module with the app. That gives one `Codable` type on both sides, so the format can't drift, and the CLI stays small and fast to start (no AppKit).
+
+- **It must be invisible:** output is copied through unchanged, `notch run` exits with the command's own status (or 128+signal), and failing to report never fails the command.
+- **Ctrl-C:** `notch` installs a no-op SIGINT handler instead of ignoring the signal. Ignored signals are inherited across `exec`, handlers aren't, so the child still stops on Ctrl-C while `notch` survives to report "Interrupted".
+- **Liveness:** it writes at most 4 times a second, and at least every 10 s even when the command is silent. The app marks a "running" activity that goes quiet for 45 s as stopped, so a killed terminal doesn't leave a spinner forever.
+- **Progress parsing** handles `45%`, `62.5 %`, `3/10`, `3 of 10`, colour codes and `\r` redraws, and ignores things like `150%` or `11/10`. It's a pure function with table-driven tests.
+- **Install** symlinks the copy inside the app bundle, so it updates with the app, and it refuses to overwrite any other program called `notch`. Nested code is signed before the app bundle.
+
 ## Known limitations
 
 - One display: the notch screen, or the main screen with a virtual notch.

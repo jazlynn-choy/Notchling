@@ -25,7 +25,7 @@ public enum ClaudeHooks {
         /usr/bin/plutil -remove "$key" "$tmp" >/dev/null 2>&1
     done
     id=$(/usr/bin/plutil -extract session_id raw -o - "$tmp" 2>/dev/null | tr -cd 'A-Za-z0-9-')
-    if [ -n "$id" ]; then mv -f "$tmp" "$dir/$id.json"; else rm -f "$tmp"; fi
+    if [ -n "$id" ]; then mv -f "$tmp" "${dir:?}/$id.json"; else rm -f "${tmp:?}"; fi
     exit 0
 
     """
@@ -37,9 +37,17 @@ public enum ClaudeHooks {
 
     /// Adds Notchling's hooks to Claude Code settings, leaving every other setting and hook alone.
     /// Idempotent: running it twice doesn't add duplicates.
-    public static func installing(into settings: [String: Any], command: String) -> [String: Any] {
+    public static func installing(into settings: [String: Any], command: String,
+                                  approvalCommand: String? = nil) -> [String: Any] {
         var settings = removing(from: settings, command: command)
+        if let approvalCommand { settings = removing(from: settings, command: approvalCommand) }
         var hooks = settings["hooks"] as? [String: Any] ?? [:]
+        if let approvalCommand {
+            var entries = hooks["PermissionRequest"] as? [[String: Any]] ?? []
+            entries.append(["matcher": "*", "hooks": [["type": "command", "command": approvalCommand,
+                                                       "timeout": ClaudeApprovals.hookTimeout]]])
+            hooks["PermissionRequest"] = entries
+        }
         for event in events {
             var entries = hooks[event] as? [[String: Any]] ?? []
             var entry: [String: Any] = ["hooks": [["type": "command", "command": command, "timeout": 5]]]
@@ -72,11 +80,13 @@ public enum ClaudeHooks {
         return settings
     }
 
-    public static func isInstalled(in settings: [String: Any], command: String) -> Bool {
+    public static func isInstalled(in settings: [String: Any], command: String,
+                                   approvalCommand: String? = nil) -> Bool {
         guard let hooks = settings["hooks"] as? [String: Any] else { return false }
-        return events.allSatisfy { event in
+        let wanted = events.map { ($0, command) } + (approvalCommand.map { [("PermissionRequest", $0)] } ?? [])
+        return wanted.allSatisfy { event, wantedCommand in
             (hooks[event] as? [[String: Any]] ?? []).contains { entry in
-                (entry["hooks"] as? [[String: Any]] ?? []).contains { ($0["command"] as? String) == command }
+                (entry["hooks"] as? [[String: Any]] ?? []).contains { ($0["command"] as? String) == wantedCommand }
             }
         }
     }
@@ -102,12 +112,15 @@ public struct ClaudeHookInstaller: Sendable {
     public var eventsDirectory: URL { supportDirectory.appendingPathComponent("agents") }
     var scriptURL: URL { supportDirectory.appendingPathComponent(ClaudeHooks.scriptName) }
     var command: String { ClaudeHooks.command(scriptPath: scriptURL.path) }
+    var approvalScriptURL: URL { supportDirectory.appendingPathComponent(ClaudeApprovals.scriptName) }
+    var approvalCommand: String { ClaudeHooks.command(scriptPath: approvalScriptURL.path) }
     /// The settings file as it was before Notchling first touched it.
     var backupURL: URL { settingsURL.appendingPathExtension("before-notchling") }
 
     public var isInstalled: Bool {
-        (try? ClaudeHooks.isInstalled(in: readSettings(), command: command)) == true
+        (try? ClaudeHooks.isInstalled(in: readSettings(), command: command, approvalCommand: approvalCommand)) == true
             && FileManager.default.isExecutableFile(atPath: scriptURL.path)
+            && FileManager.default.isExecutableFile(atPath: approvalScriptURL.path)
     }
 
     public func install() throws {
@@ -115,16 +128,20 @@ public struct ClaudeHookInstaller: Sendable {
         try fileManager.createDirectory(at: eventsDirectory, withIntermediateDirectories: true)
         try ClaudeHooks.script.write(to: scriptURL, atomically: true, encoding: .utf8)
         try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
+        try ClaudeApprovals.script.write(to: approvalScriptURL, atomically: true, encoding: .utf8)
+        try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: approvalScriptURL.path)
         let settings = try readSettings()
         if fileManager.fileExists(atPath: settingsURL.path), !fileManager.fileExists(atPath: backupURL.path) {
             try fileManager.copyItem(at: settingsURL, to: backupURL)
         }
-        try writeSettings(ClaudeHooks.installing(into: settings, command: command))
+        try writeSettings(ClaudeHooks.installing(into: settings, command: command, approvalCommand: approvalCommand))
     }
 
     public func uninstall() throws {
-        try writeSettings(ClaudeHooks.removing(from: try readSettings(), command: command))
+        let withoutStatus = ClaudeHooks.removing(from: try readSettings(), command: command)
+        try writeSettings(ClaudeHooks.removing(from: withoutStatus, command: approvalCommand))
         try? FileManager.default.removeItem(at: scriptURL)
+        try? FileManager.default.removeItem(at: approvalScriptURL)
     }
 
     /// A missing file is an empty object. A file that isn't valid JSON throws rather than

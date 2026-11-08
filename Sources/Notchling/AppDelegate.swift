@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import NotchlingActivity
 import NotchlingCore
 import NotchlingUI
 import SwiftUI
@@ -32,10 +33,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var agents = AgentStatusStore(
         source: DirectoryAgentEventSource(directory: hookSetup.installer.eventsDirectory))
     private let editor = PanelEditor()
+    private let approvals = ApprovalStore(channel: DirectoryApprovalChannel())
+    private let activities = ActivityStore()
+    private let commandSetup = CommandSetup(installer: CommandInstaller(
+        source: Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/notch")))
     // Background refreshes. Each runs only while a widget needs it (see `observeFeatures`).
     private lazy var calendarLoop = RepeatingTask(every: 15 * 60) { [calendar] in await calendar.reload() }
     private lazy var weatherLoop = RepeatingTask(every: WeatherStore.maxAge) { [weather] in await weather.refresh() }
     private lazy var agentLoop = RepeatingTask(every: 1) { [agents] in agents.refresh() }
+    private lazy var activityLoop = RepeatingTask(every: 0.5) { [activities] in activities.refresh() }
+    private lazy var approvalLoop = RepeatingTask(every: 0.25) { [approvals] in approvals.refresh() }
     private lazy var spotifyLoop = RepeatingTask(every: 30 * 60) { [spotify] in await spotify.keepAlive() }
     private var modelSubscriptions = Set<AnyCancellable>()
     private var model: NotchModel!
@@ -59,6 +66,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         notes.saveNow()
+        // Hand any waiting permission requests straight back to Claude Code's own prompt.
+        for request in approvals.requests { approvals.answer(request, .ask) }
+        approvals.setEnabled(false, waitSeconds: settings.approvalWait)
     }
 
     /// (Re)creates the live model and everything that listens to it.
@@ -86,6 +96,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .environmentObject(notes)
             .environmentObject(agents)
             .environmentObject(editor)
+            .environmentObject(approvals)
+            .environmentObject(activities)
         let host = NSHostingView(rootView: root)
         host.wantsLayer = true
         host.layer?.backgroundColor = .clear
@@ -103,7 +115,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .environmentObject(calendar)
                 .environmentObject(weather)
                 .environmentObject(spotify)
-                .environmentObject(hookSetup))
+                .environmentObject(hookSetup)
+                .environmentObject(commandSetup))
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 720),
                                   styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
             window.title = "Notchling Settings"
@@ -157,13 +170,35 @@ extension AppDelegate {
         whileShown(\.usesMedia) { [weak self] in self?.model.mediaEnabled = $0 }
         whileShown(\.usesCalendar) { [calendarLoop] in calendarLoop.setRunning($0) }   // + EKEventStoreChanged
         whileShown(\.usesWeather) { [weatherLoop] in weatherLoop.setRunning($0) }
-        whileShown(\.usesAgent) { [agentLoop] in agentLoop.setRunning($0) }        // a cheap directory read
+        whileShown(\.usesAgent) { [agentLoop] in agentLoop.setRunning($0) }
+        whileShown(\.usesActivity) { [activityLoop] in activityLoop.setRunning($0) }
+        activities.onFinished = { activity in
+            switch activity.state {
+            case .succeeded: Self.chime("Glass")
+            case .failed: Self.chime("Basso")
+            case .info, .running: Self.chime("Pop")
+            }
+        }        // a cheap directory read
 
         // Spotify: renew the sign-in at launch, every 30 minutes and after every wake.
         spotifyLoop.setRunning(true)
         NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)
             .sink { [spotifyLoop] _ in spotifyLoop.fire() }
             .store(in: &subscriptions)
+
+        // Approvals: on only when the hooks are installed and the setting is on.
+        Publishers.CombineLatest3(hookSetup.$isInstalled, settings.$approvalsEnabled, settings.$approvalWait)
+            .sink { [weak self] installed, enabled, wait in
+                guard let self else { return }
+                approvals.setEnabled(installed && enabled, waitSeconds: wait)
+                approvalLoop.setRunning(installed && enabled)
+            }
+            .store(in: &subscriptions)
+        approvals.onNewRequests = { [weak self] _ in
+            guard let self else { return }
+            setExpanded(true)
+            if settings.agentChime { Self.chime("Funk") }
+        }
 
         agents.onAttention = { [weak self] session in
             guard let self, settings.agentChime else { return }
@@ -223,8 +258,11 @@ extension AppDelegate {
 
     private func trackMouse() {
         let pointer = NSEvent.mouseLocation
+        // A permission request keeps the panel open until it's answered or times out.
+        let mustStayOpen = !approvals.requests.isEmpty
+        if mustStayOpen && !model.isExpanded { setExpanded(true) }
         if model.isExpanded {
-            if geometry.stayOpenRect(on: screen.frame).contains(pointer) {
+            if mustStayOpen || geometry.stayOpenRect(on: screen.frame).contains(pointer) {
                 collapseWork?.cancel()
                 collapseWork = nil
             } else if collapseWork == nil {

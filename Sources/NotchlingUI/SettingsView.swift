@@ -26,6 +26,7 @@ public struct SettingsView: View {
             ForEach(WidgetSlot.allCases) { WidgetSlotSection(slot: $0) }
 
             ClaudeCodeSettingsSection()
+            TerminalSettingsSection()
             MusicSettingsSection()
             if uses(.weather, .weatherCard) { WeatherSettingsSection() }
             if uses(.worldClock, .worldClockCard) { WorldClockSettingsSection() }

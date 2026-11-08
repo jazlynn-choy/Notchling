@@ -96,10 +96,24 @@ struct ExpandedView: View {
             .frame(height: max(model.notchSize.height - 6, 20))
             .padding(.horizontal, 20)
 
-            PanelCards(model: model)
+            ApprovalOrCards(model: model)
             .padding(.horizontal, 14)
             .padding(.bottom, 12)
             .frame(maxHeight: .infinity, alignment: .top)
+        }
+    }
+}
+
+/// A pending Claude Code permission request takes over the panel; otherwise the cards.
+struct ApprovalOrCards: View {
+    @ObservedObject var model: NotchModel
+    @EnvironmentObject var approvals: ApprovalStore
+
+    var body: some View {
+        if approvals.requests.isEmpty {
+            PanelCards(model: model)
+        } else {
+            ApprovalCard(now: model.now)
         }
     }
 }

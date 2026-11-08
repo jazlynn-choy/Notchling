@@ -161,12 +161,20 @@ struct ClaudeCodeSettingsSection: View {
                 Text(error).font(.caption).foregroundStyle(.red)
             }
             Toggle("Chime when Claude needs you or finishes", isOn: $settings.agentChime)
+            Toggle("Answer permission prompts from the notch", isOn: $settings.approvalsEnabled)
+            if settings.approvalsEnabled {
+                Stepper(value: $settings.approvalWait, in: ClaudeApprovals.waitRange, step: 5) {
+                    Text("Wait \(settings.approvalWait)s, then ask in the terminal")
+                }
+            }
         } header: {
             Text("Claude Code")
         } footer: {
-            Text("Connect adds a small hook to ~/.claude/settings.json (your existing settings are kept, with a "
-                 + "backup). It records only which tool Claude is using and in which folder, never your prompts "
-                 + "or file contents. New Claude Code sessions pick it up; restart open ones.")
+            Text("Connect adds two small hooks to ~/.claude/settings.json (your existing settings are kept, with a "
+                 + "backup). They record only which tool Claude is using and in which folder, never your prompts "
+                 + "or file contents. When Claude asks permission, the notch opens with Allow / Deny; if you don't "
+                 + "answer in time, Claude asks in the terminal as usual. Nothing is ever approved on its own. "
+                 + "If you connected before, click Disconnect then Connect to add approvals. Restart open sessions.")
         }
     }
 
@@ -178,6 +186,56 @@ struct ClaudeCodeSettingsSection: View {
             settings.widgets.add(.agent, to: .leftWing)
         } else {
             settings.widgets.add(.agent, to: .rightWing)
+        }
+    }
+}
+
+struct TerminalSettingsSection: View {
+    @EnvironmentObject var settings: NotchSettings
+    @EnvironmentObject var command: CommandSetup
+
+    var body: some View {
+        Section {
+            HStack {
+                if let path = command.installedAt {
+                    Label("Installed", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    Text(path.path).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1)
+                    Spacer()
+                    Button("Uninstall") { command.uninstall() }
+                } else {
+                    Text("Show any terminal command's progress in the notch.")
+                    Spacer()
+                    Button("Install") { install() }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(!command.isAvailable)
+                }
+            }
+            if let message = command.message {
+                Text(message).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text("notch run npm test").font(.caption.monospaced())
+                Text("long-command | notch").font(.caption.monospaced())
+                Text("notch \"Deploy finished\"").font(.caption.monospaced())
+            }
+            .foregroundStyle(.secondary)
+            .textSelection(.enabled)
+        } header: {
+            Text("The notch command")
+        } footer: {
+            Text("Shows the command's latest output and any progress (\"45%\", \"3/10\") while it runs, then ✓ or ✗ "
+                 + "with how long it took, and a chime. The command's output and exit code are unchanged.")
+        }
+    }
+
+    /// Installing also puts the terminal widget beside the notch, so it's visible straight away.
+    private func install() {
+        command.install()
+        guard command.installedAt != nil, !settings.widgets.allWidgets.contains(where: \.usesActivity) else { return }
+        if settings.widgets.addable(to: .rightWing).contains(.activity) {
+            settings.widgets.add(.activity, to: .rightWing)
+        } else {
+            settings.widgets.add(.activity, to: .leftWing)
         }
     }
 }

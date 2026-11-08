@@ -4,7 +4,10 @@
 [![Latest release](https://img.shields.io/github/v/release/jazlynn-choy/Notchling)](https://github.com/jazlynn-choy/Notchling/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A macOS menu-bar companion that turns the dead space around the MacBook camera notch into something useful.
+A notch hub for developers: supervise your AI coding agents, watch your builds, and keep music, to-dos and your calendar in view, all in the dead space around the MacBook camera notch.
+
+- **Approve Claude Code from the notch.** When Claude asks permission ("Run `npm test`?"), the notch drops down with **Allow / Deny**. No window switching. If you don't answer in time, Claude asks in the terminal as usual: nothing is ever approved on its own.
+- **`notch run <command>`** shows any terminal command's progress in the notch (latest output, "45%" or "3/10" progress), then ✓ or ✗ with how long it took, and a chime. Pipe into it (`npm test | notch`) or send a message (`notch "Deploy finished"`).
 
 - **Collapsed:** slim black "wings" extend the notch and show what's playing (or the date), your open reminders count, the time, and battery.
 - **Hover the notch:** a panel drops down with music controls and your **Apple Reminders**, synced both ways: add or tick off a reminder here and it updates on your iPhone.
@@ -45,7 +48,17 @@ On first use, macOS asks for permission to access Reminders and Calendar and to 
 
 ### Connect Claude Code
 
-Settings → Claude Code → **Connect**. That adds a hook to `~/.claude/settings.json`: a small script Claude Code runs on each event, which saves the session's latest status for the notch. Your other settings and hooks are kept, and the original file is backed up as `settings.json.before-notchling`. Only the event type, tool name, file or command and folder are kept, never your prompts or file contents. Restart open Claude Code sessions to pick it up. **Disconnect** removes exactly what was added.
+Settings → Claude Code → **Connect**. That adds two hooks to `~/.claude/settings.json`: one saves each session's latest status for the notch, and a `PermissionRequest` hook lets you answer permission prompts from the notch (switch it off, or change how long it waits, in the same section). Your other settings and hooks are kept, and the original file is backed up as `settings.json.before-notchling`. Only the event type, tool name, file or command and folder are kept, never your prompts or file contents. Restart open Claude Code sessions to pick it up. **Disconnect** removes exactly what was added.
+
+### The `notch` command
+
+Settings → The notch command → **Install** links `notch` onto your PATH (into Homebrew's `bin` if it's writable, else `~/.local/bin`). Then:
+
+```bash
+notch run npm run build          # progress in the notch, ✓/✗ + chime when done, same exit code
+swift test 2>&1 | notch -t Tests # or pipe any output into it
+notch "Deploy finished"          # a one-off message; also: notch done …, notch fail …
+```
 
 ### Connect Spotify (for song search)
 
@@ -86,7 +99,7 @@ The architecture, and why it's built this way, is written up in [docs/ARCHITECTU
 
 ## Testing
 
-The core module is covered by 170 tests: stacking, drop targets, drag-to-reorder and resize math, the Claude Code hook script (run for real against sample events) and its settings installer, layout geometry, the widget layout and its migration, card sizing, the focus timer, calendar labels, music search, the Spotify sign-in (including a real loopback-server test), weather parsing and caching, world clocks, date labels, sorting, AppleScript/IOKit parsing, settings persistence, and the reminders sync behaviour. The sync tests run against `FakeRemindersProvider`, so they need no permissions and touch none of your real data.
+The core module is covered by 189 tests: the approval hook script (run for real: Allow, Deny and fall back to the terminal), the `notch` command's progress parsing and activity lifecycle, stacking, drop targets, drag-to-reorder and resize math, the Claude Code hook script (run for real against sample events) and its settings installer, layout geometry, the widget layout and its migration, card sizing, the focus timer, calendar labels, music search, the Spotify sign-in (including a real loopback-server test), weather parsing and caching, world clocks, date labels, sorting, AppleScript/IOKit parsing, settings persistence, and the reminders sync behaviour. The sync tests run against `FakeRemindersProvider`, so they need no permissions and touch none of your real data.
 
 ```bash
 make test

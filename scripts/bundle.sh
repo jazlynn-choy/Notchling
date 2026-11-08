@@ -17,20 +17,28 @@ BUILD=$(git rev-list --count HEAD 2>/dev/null || echo 1)
 APP=build/Notchling.app
 
 swift build -c release --product Notchling
-BIN=$(swift build -c release --show-bin-path)/Notchling
+swift build -c release --product notch
+BIN_DIR=$(swift build -c release --show-bin-path)
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
-cp "$BIN" "$APP/Contents/MacOS/Notchling"
+cp "$BIN_DIR/Notchling" "$APP/Contents/MacOS/Notchling"
+# The `notch` command ships inside the app; Settings symlinks it onto the PATH.
+cp "$BIN_DIR/notch" "$APP/Contents/MacOS/notch"
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" Resources/Info.plist > "$APP/Contents/Info.plist"
 
 DEV_IDENTITY="Notchling Dev"
+# Nested code is signed first, then the app around it (codesign rejects the reverse).
+sign() {
+    codesign --force "$@" "$APP/Contents/MacOS/notch"
+    codesign --force "$@" "$APP"
+}
 if [[ -n "${SIGN_IDENTITY:-}" ]]; then
-    codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP"
+    sign --options runtime --timestamp --sign "$SIGN_IDENTITY"
 elif security find-certificate -c "$DEV_IDENTITY" >/dev/null 2>&1; then
-    codesign --force --timestamp=none --sign "$DEV_IDENTITY" "$APP"
+    sign --timestamp=none --sign "$DEV_IDENTITY"
 else
-    codesign --force --sign - "$APP"
+    sign --sign -
     echo "warning: ad-hoc signed, so macOS will ask for permissions again after every build." >&2
     echo "         Create a \"$DEV_IDENTITY\" certificate once to fix that (see README)." >&2
 fi

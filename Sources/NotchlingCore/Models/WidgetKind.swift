@@ -43,6 +43,7 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
     case worldClock = "worldClock"
     case countdown = "countdown"
     case agent = "agent"
+    case activity = "activity"
     // Panel widgets
     case musicCard = "musicCard"
     case remindersCard = "remindersCard"
@@ -54,6 +55,7 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
     case countdownCard = "countdownCard"
     case notesCard = "notesCard"
     case agentCard = "agentCard"
+    case activityCard = "activityCard"
 
     public var id: String { rawValue }
 
@@ -78,6 +80,8 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
         case .notesCard: return "Notes"
         case .agent: return "Claude Code"
         case .agentCard: return "Claude Code sessions"
+        case .activity: return "Terminal"
+        case .activityCard: return "Terminal activity"
         }
     }
 
@@ -105,6 +109,8 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
         case .notesCard: return "A scratchpad that's saved as you type"
         case .agent: return "What Claude Code is doing, and when it needs you"
         case .agentCard: return "Every Claude Code session: working, waiting or done"
+        case .activity: return "Progress of a `notch run` command, then ✓ or ✗"
+        case .activityCard: return "Recent commands and messages from the `notch` command"
         }
     }
 
@@ -125,16 +131,17 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
         case .countdown, .countdownCard: return "hourglass"
         case .notesCard: return "note.text"
         case .agent, .agentCard: return "sparkle"
+        case .activity, .activityCard: return "terminal"
         }
     }
 
     public func fits(_ slot: WidgetSlot) -> Bool {
         switch self {
         case .nowPlaying, .nowPlayingOrDate, .date, .time, .battery, .reminderCount, .focusTimer, .nextEvent,
-             .weather, .worldClock, .countdown, .agent:
+             .weather, .worldClock, .countdown, .agent, .activity:
             return slot.isWing
         case .musicCard, .remindersCard, .dayCard, .focusCard, .calendarCard, .weatherCard, .worldClockCard,
-             .countdownCard, .notesCard, .agentCard:
+             .countdownCard, .notesCard, .agentCard, .activityCard:
             return slot == .panel
         }
     }
@@ -143,6 +150,7 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
     public var defaultCardSize: CardSize {
         switch self {
         case .remindersCard, .calendarCard, .agentCard: return .large
+        case .activityCard: return .medium
         case .musicCard, .notesCard, .worldClockCard: return .medium
         default: return .small
         }
@@ -159,6 +167,9 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
 
     /// Whether this widget shows Claude Code activity, so the app only watches for it when needed.
     public var usesAgent: Bool { self == .agent || self == .agentCard }
+
+    /// Whether this widget shows `notch` command activity.
+    public var usesActivity: Bool { self == .activity || self == .activityCard }
 }
 
 /// Starting sizes for panel cards. Users can then drag a card to any width in between;
