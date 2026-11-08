@@ -38,7 +38,7 @@ struct RemindersCard: View {
     }
 
     @ViewBuilder private var list: some View {
-        ScrollView(.vertical, showsIndicators: false) {
+        VerticalScroll {
             VStack(alignment: .leading, spacing: 5) {
                 if reminders.items.isEmpty {
                     Text("All done 🎉").font(.system(size: 11)).foregroundStyle(.white.opacity(0.4))
@@ -54,10 +54,10 @@ struct RemindersCard: View {
         HStack(spacing: 6) {
             Image(systemName: "plus").font(.system(size: 9, weight: .bold))
                 .foregroundStyle(.white.opacity(0.5))
-            TextField("Add a reminder", text: $reminders.draft)
-                .textFieldStyle(.plain)
-                .font(.system(size: 11))
-                .onSubmit { Task { await reminders.addDraft() } }
+            NotchTextField(placeholder: "Add a reminder", text: $reminders.draft) {
+                Task { await reminders.addDraft() }
+            }
+            .font(.system(size: 11))
         }
         .padding(.horizontal, 8).padding(.vertical, 4)
         .background(RoundedRectangle(cornerRadius: 7).fill(Color.white.opacity(0.08)))

@@ -20,6 +20,10 @@ let package = Package(
         .executableTarget(name: "notch", dependencies: ["NotchlingActivity"]),
         // The app: window, mouse tracking and wiring real providers together.
         .executableTarget(name: "Notchling", dependencies: ["NotchlingCore", "NotchlingUI"]),
+        // Renders docs/demo.gif from the real views with demo data (`make demo`). Not shipped.
+        .executableTarget(name: "NotchlingDemo",
+                          dependencies: ["NotchlingCore", "NotchlingUI", "NotchlingActivity"],
+                          path: "Tools/NotchlingDemo"),
         .testTarget(name: "NotchlingCoreTests", dependencies: ["NotchlingCore", "NotchlingActivity"]),
     ],
     swiftLanguageModes: [.v6]

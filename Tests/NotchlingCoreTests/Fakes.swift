@@ -170,3 +170,14 @@ final class FakeWeatherProvider: WeatherProviding, @unchecked Sendable {
         return nextReport!
     }
 }
+
+/// Waits until `condition` holds (checking every 5 ms, up to `timeout`), for effects that
+/// happen in a background Task. Unlike a fixed sleep, it's fast when things are fast and
+/// doesn't fail just because a CI machine is busy.
+@MainActor
+func eventually(timeout: Duration = .seconds(2), _ condition: () -> Bool) async {
+    let deadline = ContinuousClock.now + timeout
+    while !condition(), ContinuousClock.now < deadline {
+        try? await Task.sleep(for: .milliseconds(5))
+    }
+}

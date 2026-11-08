@@ -20,8 +20,11 @@ struct ApprovalCard: View {
                     Text(request.project).font(.system(size: 10)).foregroundStyle(.white.opacity(0.5)).lineLimit(1)
                 }
 
+                if let note = request.note {
+                    Text(note).font(.system(size: 10)).foregroundStyle(.white.opacity(0.6)).lineLimit(1)
+                }
                 if let detail = request.detail {
-                    ScrollView(.vertical, showsIndicators: false) {
+                    VerticalScroll {
                         Text(detail)
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.9))

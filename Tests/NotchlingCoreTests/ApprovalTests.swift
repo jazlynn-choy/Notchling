@@ -65,6 +65,7 @@ struct ApprovalScriptTests {
         let request = try #require(ApprovalRequest(id: pending.id, json: pending.data, createdAt: pending.date))
         #expect(request.title == "Run a command")
         #expect(request.detail == "npm test")
+        #expect(request.note == nil)
         #expect(request.project == "App")
         let saved = String(data: pending.data, encoding: .utf8) ?? ""
         #expect(!saved.contains("transcript"))   // stripped before it touches disk
@@ -156,6 +157,18 @@ struct ApprovalStoreTests {
                                       detail: nil, createdAt: now)
         #expect(store.secondsLeft(for: request, now: now.addingTimeInterval(100)) == 20)
         #expect(store.secondsLeft(for: request, now: now.addingTimeInterval(500)) == 0)
+    }
+
+    /// You approve what will actually run, not Claude's summary of it.
+    @Test func approvalShowsTheExactCommandNotTheDescription() throws {
+        // swiftlint:disable:next line_length - JSON exactly as Claude Code sends it
+        let json = #"{"session_id":"s","hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"rm -rf build && npm test","description":"Run the tests"}}"#
+        let request = try #require(ApprovalRequest(id: "a", json: Data(json.utf8), createdAt: now))
+        #expect(request.detail == "rm -rf build && npm test")
+        #expect(request.note == "Run the tests")
+        // swiftlint:disable:next line_length - JSON exactly as Claude Code sends it
+        let edit = #"{"session_id":"s","hook_event_name":"PermissionRequest","tool_name":"Edit","tool_input":{"file_path":"/p/a.swift","description":"tidy"}}"#
+        #expect(ApprovalRequest(id: "b", json: Data(edit.utf8), createdAt: now)?.title == "Edit a.swift")
     }
 
     @Test func craftedIDsAreRejected() {

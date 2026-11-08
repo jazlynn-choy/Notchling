@@ -97,7 +97,7 @@ struct ActivityCard: View {
                 Text("Try:  notch run npm test")
                     .font(.system(size: 10, design: .monospaced)).foregroundStyle(.white.opacity(0.45))
             }
-            ScrollView(.vertical, showsIndicators: false) {
+            VerticalScroll {
                 VStack(alignment: .leading, spacing: 7) {
                     ForEach(activities.activities) { activity in
                         HStack(alignment: .top, spacing: 7) {

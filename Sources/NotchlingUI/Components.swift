@@ -118,3 +118,51 @@ extension EnvironmentValues {
         set { self[OpenNotchSettingsKey.self] = newValue }
     }
 }
+
+// MARK: - Snapshot mode
+
+/// True when the views are rendered to an image (`make demo`) instead of shown on screen.
+/// SwiftUI's ImageRenderer can't draw AppKit-backed views, so scroll views and text fields
+/// swap in plain equivalents. Nothing else changes, so the demo shows the real layout.
+private struct NotchSnapshotKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    public var notchSnapshot: Bool {
+        get { self[NotchSnapshotKey.self] }
+        set { self[NotchSnapshotKey.self] = newValue }
+    }
+}
+
+/// A vertical scroll view, or (in snapshot mode) the same content clipped to the space.
+struct VerticalScroll<Content: View>: View {
+    @Environment(\.notchSnapshot) private var snapshot
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        if snapshot {
+            content.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).clipped()
+        } else {
+            ScrollView(.vertical, showsIndicators: false) { content }
+        }
+    }
+}
+
+/// A one-line text field, or (in snapshot mode) its placeholder as plain text.
+struct NotchTextField: View {
+    let placeholder: String
+    @Binding var text: String
+    var onSubmit: () -> Void = {}
+    @Environment(\.notchSnapshot) private var snapshot
+
+    var body: some View {
+        if snapshot {
+            Text(text.isEmpty ? placeholder : text)
+                .foregroundStyle(.white.opacity(text.isEmpty ? 0.35 : 0.9))
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            TextField(placeholder, text: $text).textFieldStyle(.plain).onSubmit(onSubmit)
+        }
+    }
+}

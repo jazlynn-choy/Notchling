@@ -26,7 +26,7 @@ struct CalendarCard: View {
         if events.isEmpty {
             Text("Nothing else today").font(.system(size: 11)).foregroundStyle(.white.opacity(0.4))
         }
-        ScrollView(.vertical, showsIndicators: false) {
+        VerticalScroll {
             VStack(alignment: .leading, spacing: 5) {
                 ForEach(events) { event in
                     HStack(spacing: 7) {

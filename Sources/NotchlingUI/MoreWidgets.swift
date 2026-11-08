@@ -153,6 +153,7 @@ struct CountdownCard: View {
 
 struct NotesCard: View {
     @EnvironmentObject var notes: NotesStore
+    @Environment(\.notchSnapshot) private var snapshot
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -166,11 +167,16 @@ struct NotesCard: View {
                         .padding(.leading, 5)
                         .allowsHitTesting(false)
                 }
-                TextEditor(text: $notes.text)
-                    .font(.system(size: 11))
-                    .scrollContentBackground(.hidden)
-                    .scrollIndicators(.never)
-                    .accessibilityLabel("Notes")
+                if snapshot {
+                    Text(notes.text).font(.system(size: 11)).padding(.leading, 5)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                } else {
+                    TextEditor(text: $notes.text)
+                        .font(.system(size: 11))
+                        .scrollContentBackground(.hidden)
+                        .scrollIndicators(.never)
+                        .accessibilityLabel("Notes")
+                }
             }
         }
         .cardStyle()

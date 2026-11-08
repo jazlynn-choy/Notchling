@@ -74,18 +74,22 @@ public struct ApprovalRequest: Identifiable, Equatable, Sendable {
     public var toolName: String
     /// "Run a command", "Edit NotchView.swift", "Use github".
     public var title: String
-    /// The full command or path, for the user to check before allowing.
+    /// The exact command or path, for the user to check before allowing. Never Claude's
+    /// paraphrase: you approve what will actually run.
     public var detail: String?
+    /// Claude's description of what it's doing ("Run the test suite"), shown as a caption.
+    public var note: String?
     public var createdAt: Date
 
     public init(id: String, sessionID: String, project: String, toolName: String, title: String,
-                detail: String?, createdAt: Date) {
+                detail: String?, note: String? = nil, createdAt: Date) {
         self.id = id
         self.sessionID = sessionID
         self.project = project
         self.toolName = toolName
         self.title = title
         self.detail = detail
+        self.note = note
         self.createdAt = createdAt
     }
 
@@ -94,8 +98,9 @@ public struct ApprovalRequest: Identifiable, Equatable, Sendable {
         let tool = event.toolName ?? "a tool"
         self.init(id: id, sessionID: event.sessionID,
                   project: event.cwd.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "Claude Code",
-                  toolName: tool, title: Self.title(tool: tool, detail: event.toolDetail),
-                  detail: event.toolDetail.map { String($0.prefix(400)) }, createdAt: createdAt)
+                  toolName: tool, title: Self.title(tool: tool, detail: event.toolTarget),
+                  detail: event.toolTarget.map { String($0.prefix(600)) },
+                  note: event.toolDescription.map { String($0.prefix(120)) }, createdAt: createdAt)
     }
 
     /// Phrased as what Claude wants to do: "Claude wants to: Run a command".

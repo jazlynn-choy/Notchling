@@ -53,15 +53,23 @@ public struct AgentEvent: Equatable, Sendable {
     public var toolName: String?
     public var toolDetail: String?
     public var message: String?
+    /// The exact command (Bash) or path the tool acts on, never a paraphrase. What a
+    /// permission prompt must show, since a description can be vague or wrong.
+    public var toolTarget: String?
+    /// Claude's own one-line description of the tool call, if it gave one.
+    public var toolDescription: String?
 
     public init(sessionID: String, name: String, cwd: String? = nil, toolName: String? = nil,
-                toolDetail: String? = nil, message: String? = nil) {
+                toolDetail: String? = nil, message: String? = nil, toolTarget: String? = nil,
+                toolDescription: String? = nil) {
         self.sessionID = sessionID
         self.name = name
         self.cwd = cwd
         self.toolName = toolName
         self.toolDetail = toolDetail
         self.message = message
+        self.toolTarget = toolTarget
+        self.toolDescription = toolDescription
     }
 
     /// Lenient: unknown fields are ignored, and only `session_id` and `hook_event_name` are required.
@@ -72,9 +80,12 @@ public struct AgentEvent: Equatable, Sendable {
         let input = object["tool_input"] as? [String: Any] ?? [:]
         let detail = ["file_path", "notebook_path", "description", "command", "pattern", "url", "query"]
             .lazy.compactMap { input[$0] as? String }.first { !$0.isEmpty }
+        let target = ["command", "file_path", "notebook_path", "url", "pattern", "query"]
+            .lazy.compactMap { input[$0] as? String }.first { !$0.isEmpty }
         self.init(sessionID: id, name: name, cwd: object["cwd"] as? String,
                   toolName: object["tool_name"] as? String, toolDetail: detail,
-                  message: object["message"] as? String)
+                  message: object["message"] as? String, toolTarget: target,
+                  toolDescription: (input["description"] as? String).flatMap { $0.isEmpty ? nil : $0 })
     }
 }
 

@@ -21,7 +21,9 @@ A notch hub for developers: supervise your AI coding agents, watch your builds, 
 - **Calendar:** your next event ("Standup 12m") beside the notch, and the rest of today in the panel.
 - **Everything else is adjustable** in Settings: wing width (down to zero), panel size, which Reminders list, haptics, and open at login.
 
-<!-- TODO: add a screenshot or GIF here — docs/demo.gif -->
+![Notchling: Claude Code status and a build in the notch, then answering a permission prompt from the notch](docs/demo.gif)
+
+<sub>Rendered from the app's real SwiftUI views with demo data (`make demo`).</sub>
 
 ## Install
 
@@ -121,7 +123,6 @@ The [release workflow](.github/workflows/release.yml) runs the tests, builds `No
 
 ## Roadmap
 
-- [ ] Screenshot / demo GIF in this README
 - [ ] Developer ID signing, notarization and a `.dmg` release in CI
 - [ ] Auto-updates (Sparkle)
 - [ ] Apple Music catalog search (MusicKit)

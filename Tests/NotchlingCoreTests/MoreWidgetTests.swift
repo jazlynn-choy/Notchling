@@ -235,7 +235,7 @@ struct WeatherStoreTests {
         provider.nextReport = report(27, at: clock.now)
         let store = WeatherStore(provider: provider, defaults: defaults, clock: { clock.now })
         store.choose(place)
-        try await Task.sleep(for: .milliseconds(30))
+        await store.settleRefresh()
         #expect(store.report?.temperature == 27)
         #expect(WeatherStore(provider: provider, defaults: defaults).place == place)
     }

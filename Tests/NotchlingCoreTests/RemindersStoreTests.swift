@@ -137,7 +137,7 @@ struct RemindersStoreTests {
         await store.reload()
         provider.reminders[""] = [Todo(id: "phone", title: "Added on iPhone")]
         provider.simulateExternalChange()
-        try await Task.sleep(for: .milliseconds(50))
+        await eventually { store.items.map(\.id) == ["phone"] }
         #expect(store.items.map(\.id) == ["phone"])
     }
 }

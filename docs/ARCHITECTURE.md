@@ -163,6 +163,11 @@ A second executable in the package, sharing a tiny Foundation-only `NotchlingAct
 - **Progress parsing** handles `45%`, `62.5 %`, `3/10`, `3 of 10`, colour codes and `\r` redraws, and ignores things like `150%` or `11/10`. It's a pure function with table-driven tests.
 - **Install** symlinks the copy inside the app bundle, so it updates with the app, and it refuses to overwrite any other program called `notch`. Nested code is signed before the app bundle.
 
+### 20. The README demo is rendered, not recorded
+`make demo` runs `Tools/NotchlingDemo`, which builds the real `NotchView` with demo data, using fakes of the same provider protocols the app uses. It renders a storyboard with `ImageRenderer` and writes `docs/demo.gif` and `docs/screenshot.png` with ImageIO. It needs no screen-recording permission, it's sharp, and it's the same every time, so it can be regenerated whenever the UI changes.
+
+`ImageRenderer` can't draw AppKit-backed views, so a `notchSnapshot` environment flag swaps scroll views and text fields for plain equivalents. Nothing else differs. Watching the frames caught a real bug: the approval card showed Claude's *description* of a command instead of the command itself. It now always shows the exact command or path, with the description as a caption (tested).
+
 ## Known limitations
 
 - One display: the notch screen, or the main screen with a virtual notch.

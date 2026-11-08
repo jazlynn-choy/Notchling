@@ -130,7 +130,7 @@ struct SongSearchView: View {
             .padding(.horizontal, 8).padding(.vertical, 4)
             .background(RoundedRectangle(cornerRadius: 7).fill(Color.white.opacity(0.08)))
 
-            ScrollView(.vertical, showsIndicators: false) {
+            VerticalScroll {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(search.results) { song in
                         Button { search.play(song) } label: {

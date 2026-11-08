@@ -87,8 +87,13 @@ struct SpotifyAuthTests {
         let port: UInt16 = 43_917
         let server = LoopbackCallbackServer()
         let waiting = Task { try await server.waitForCallback(port: port, path: "/callback", timeout: .seconds(5)) }
-        try await Task.sleep(for: .milliseconds(200))
-        let favicon = try await URLSession.shared.data(from: URL(string: "http://127.0.0.1:\(port)/favicon.ico")!)
+        // Retry until the listener is up, rather than guessing how long that takes.
+        var firstResponse: (Data, URLResponse)?
+        for _ in 0..<100 where firstResponse == nil {
+            firstResponse = try? await URLSession.shared.data(from: URL(string: "http://127.0.0.1:\(port)/favicon.ico")!)
+            if firstResponse == nil { try await Task.sleep(for: .milliseconds(20)) }
+        }
+        let favicon = try #require(firstResponse)
         #expect((favicon.1 as? HTTPURLResponse)?.statusCode == 404)
         let (_, response) = try await URLSession.shared.data(
             from: URL(string: "http://127.0.0.1:\(port)/callback?code=xyz&state=s")!)

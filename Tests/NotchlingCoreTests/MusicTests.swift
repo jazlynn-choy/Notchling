@@ -20,7 +20,7 @@ struct MusicTests {
         await model.refreshMedia()
         model.cycleRepeat()
         #expect(model.track?.repeatMode == .all)
-        try? await Task.sleep(for: .milliseconds(50))
+        await eventually { !media.repeatRequests.isEmpty }
         #expect(media.repeatRequests == [.all])
     }
 
@@ -30,7 +30,7 @@ struct MusicTests {
         model.preferredApp = .spotify
         model.send(.playPause)
         model.send(.nextTrack)   // meaningless without a track: ignored
-        try await Task.sleep(for: .milliseconds(50))
+        await eventually { !media.resumed.isEmpty }
         #expect(media.resumed == [.spotify])
         #expect(media.sent.isEmpty)
     }
@@ -80,7 +80,7 @@ struct MusicTests {
         search.onPlay = { played = true }
         search.isOpen = true
         search.play(media.library[2])
-        try await Task.sleep(for: .milliseconds(50))
+        await eventually { played }
         #expect(media.played.map(\.id) == ["3"])
         #expect(!search.isOpen)
         #expect(played)
@@ -92,7 +92,7 @@ struct MusicTests {
         search.isOpen = true
         search.query = "  not in my library "
         search.searchSpotify()
-        try await Task.sleep(for: .milliseconds(50))
+        await eventually { !media.spotifySearches.isEmpty }
         #expect(media.spotifySearches == ["not in my library"])
         #expect(!search.isOpen)
     }

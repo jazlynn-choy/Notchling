@@ -18,7 +18,8 @@ struct AgentActivityTests {
         let json = #"{"session_id":"s1","hook_event_name":"PreToolUse","cwd":"/Users/me/Camera Notch","tool_name":"Edit","tool_input":{"file_path":"/x/NotchView.swift"},"extra":{"ignored":true}}"#
         let event = try #require(AgentEvent(json: Data(json.utf8)))
         #expect(event == AgentEvent(sessionID: "s1", name: "PreToolUse", cwd: "/Users/me/Camera Notch",
-                                    toolName: "Edit", toolDetail: "/x/NotchView.swift"))
+                                    toolName: "Edit", toolDetail: "/x/NotchView.swift",
+                                    toolTarget: "/x/NotchView.swift"))
         #expect(AgentEvent(json: Data(#"{"hook_event_name":"Stop"}"#.utf8)) == nil)
         #expect(AgentEvent(json: Data("not json".utf8)) == nil)
     }

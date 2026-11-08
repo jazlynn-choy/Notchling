@@ -12,7 +12,7 @@ public final class WeatherStore: ObservableObject {
     @Published public var unit: TemperatureUnit {
         didSet {
             defaults.set(unit.rawValue, forKey: Key.unit)
-            if unit != oldValue { report = nil; Task { await refresh(force: true) } }
+            if unit != oldValue { report = nil; refreshTask = Task { await refresh(force: true) } }
         }
     }
     @Published public private(set) var report: WeatherReport?
@@ -32,6 +32,8 @@ public final class WeatherStore: ObservableObject {
     private let clock: () -> Date
     private let debounce: Duration
     private var searchTask: Task<Void, Never>?
+    /// The fetch started by choosing a city or unit; tests await it instead of sleeping.
+    private var refreshTask: Task<Void, Never>?
 
     public init(provider: WeatherProviding, defaults: UserDefaults = .standard,
                 locale: Locale = .current, clock: @escaping () -> Date = Date.init,
@@ -53,7 +55,7 @@ public final class WeatherStore: ObservableObject {
                      forKey: Key.place)
         placeQuery = ""
         report = nil
-        Task { await refresh(force: true) }
+        refreshTask = Task { await refresh(force: true) }
     }
 
     /// Fetches unless the last report is still fresh.
@@ -88,6 +90,7 @@ public final class WeatherStore: ObservableObject {
         }
     }
 
-    /// Test hook.
+    /// Test hooks.
     func settleSearch() async { await searchTask?.value }
+    func settleRefresh() async { await refreshTask?.value }
 }

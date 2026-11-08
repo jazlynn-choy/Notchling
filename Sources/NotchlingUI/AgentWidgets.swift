@@ -82,7 +82,7 @@ struct AgentCard: View {
                         .foregroundStyle(AgentState.working.color)
                 }
             }
-            ScrollView(.vertical, showsIndicators: false) {
+            VerticalScroll {
                 VStack(alignment: .leading, spacing: 7) {
                     ForEach(agents.sessions) { session in
                         HStack(alignment: .top, spacing: 7) {
