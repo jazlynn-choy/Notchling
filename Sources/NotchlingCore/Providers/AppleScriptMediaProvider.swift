@@ -64,12 +64,14 @@ public struct AppleScriptMediaProvider: MediaProviding {
     }
 
     public func play(_ song: SongResult) async {
-        let script = """
-        on run argv
-            tell application "Music" to play (first track of library playlist 1 whose persistent ID is (item 1 of argv))
-        end run
-        """
-        _ = Self.run(script, arguments: [song.id])
+        let command: String
+        switch song.app {
+        case .music:
+            command = "tell application \"Music\" to play (first track of library playlist 1 whose persistent ID is (item 1 of argv))"
+        case .spotify:
+            command = "tell application \"Spotify\" to play track (item 1 of argv)"
+        }
+        _ = Self.run("on run argv\n\(command)\nend run", arguments: [song.id])
     }
 
     public func openSpotifySearch(_ query: String) async {

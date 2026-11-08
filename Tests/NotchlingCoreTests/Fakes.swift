@@ -111,3 +111,59 @@ func makeIsolatedDefaults(_ name: String = #function) -> UserDefaults {
     defaults.removePersistentDomain(forName: suite)
     return defaults
 }
+
+/// Canned HTTP responses. Records every request so tests can check what was sent.
+final class FakeHTTPClient: HTTPClient, @unchecked Sendable {
+    var handler: (URLRequest) throws -> (Int, String) = { _ in (404, "") }
+    private(set) var requests: [URLRequest] = []
+    private let lock = NSLock()
+
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        lock.withLock { requests.append(request) }
+        let (status, body) = try handler(request)
+        let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
+        return (Data(body.utf8), response)
+    }
+
+    func formBody(of request: URLRequest) -> [String: String] {
+        let text = String(data: request.httpBody ?? Data(), encoding: .utf8) ?? ""
+        return Dictionary(uniqueKeysWithValues: text.split(separator: "&").map { pair in
+            let parts = pair.split(separator: "=", maxSplits: 1).map(String.init)
+            return (parts[0], (parts.count > 1 ? parts[1] : "").removingPercentEncoding ?? "")
+        })
+    }
+}
+
+final class InMemorySecretStore: SecretStore, @unchecked Sendable {
+    var values: [String: String] = [:]
+    func read(_ key: String) -> String? { values[key] }
+    func write(_ value: String, for key: String) { values[key] = value }
+    func delete(_ key: String) { values[key] = nil }
+}
+
+/// Plays the browser: once the app "opens" the authorize URL, redirects back with its state.
+final class FakeAuthCallback: AuthCallbackReceiving, @unchecked Sendable {
+    var authorizeURL: URL?
+    var reply: (_ state: String) -> String = { "/callback?code=the-code&state=\($0)" }
+
+    func waitForCallback(port: UInt16, path: String, timeout: Duration) async throws -> URL {
+        while authorizeURL == nil { try await Task.sleep(for: .milliseconds(5)) }
+        let items = URLComponents(url: authorizeURL!, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let state = items.first { $0.name == "state" }?.value ?? ""
+        return URL(string: "http://127.0.0.1:\(port)\(reply(state))")!
+    }
+}
+
+final class FakeWeatherProvider: WeatherProviding, @unchecked Sendable {
+    var places: [Place] = []
+    var nextReport: WeatherReport?
+    var fail = false
+    private(set) var reportRequests = 0
+
+    func searchPlaces(_ query: String) async throws -> [Place] { places }
+    func report(for place: Place, unit: TemperatureUnit) async throws -> WeatherReport {
+        reportRequests += 1
+        if fail { throw URLError(.notConnectedToInternet) }
+        return nextReport!
+    }
+}

@@ -73,17 +73,20 @@ public enum RepeatMode: String, Sendable, CaseIterable {
     }
 }
 
-/// A song found by searching the Music library.
+/// A song found by search, in either player.
 public struct SongResult: Identifiable, Equatable, Sendable {
-    /// Music's persistent ID, stable across launches.
+    /// Music's persistent ID, or a Spotify URI like `spotify:track:…`.
     public let id: String
     public let title: String
     public let artist: String
+    /// Which app can play it.
+    public let app: MediaApp
 
-    public init(id: String, title: String, artist: String) {
+    public init(id: String, title: String, artist: String, app: MediaApp = .music) {
         self.id = id
         self.title = title
         self.artist = artist
+        self.app = app
     }
 }
 

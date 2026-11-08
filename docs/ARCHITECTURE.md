@@ -104,8 +104,24 @@ The song search sends what you type to AppleScript as an *argument* (`on run arg
 ### 11. Permissions and signing
 macOS ties privacy permissions to an app's code signature. `scripts/bundle.sh` signs with a stable local `Notchling Dev` certificate when there is one, so permissions survive rebuilds, and warns when it has to fall back to ad hoc signing.
 
+### 12. Spotify sign-in: PKCE, loopback redirect, Keychain
+Searching Spotify's catalog needs a Web API token. Notchling uses **Authorization Code with PKCE**, the flow meant for apps that can't keep a secret:
+
+- The app makes a random verifier and sends only its SHA-256 hash with the sign-in, then proves it holds the verifier when it swaps the code for tokens. No client secret is shipped. Tested against the RFC 7636 example.
+- The browser redirects to `http://127.0.0.1:43821/callback`, caught by a one-shot `NWListener` bound to loopback only. It ignores stray requests like `/favicon.ico`, shuts down after the first real callback, and times out after 3 minutes. A test drives it with real HTTP requests.
+- The `state` parameter is checked, so a page can't inject its own code (tested).
+- Only the refresh token is stored, in the **Keychain**. Access tokens stay in memory and refresh a minute before they expire. Two searches at once share **one** refresh (tested). A revoked token signs the user out cleanly instead of failing forever.
+- Search asks for **no scopes**. Playback goes through the Spotify app's AppleScript `play track`, so it works on free accounts too.
+
+### 13. Network widgets fail soft
+Weather comes from Open-Meteo (no key, no account), is cached for 20 minutes, and is only fetched while a weather widget is in the layout. A failed update keeps showing the last report with a small error, rather than blanking the widget (tested). All network access goes through an `HTTPClient` protocol, so parsing and error paths are tested with fixtures trimmed from real responses.
+
+### 14. Card sizes are weights
+Panel cards are Small, Medium or Large, which are weights (1, 1.6, 2.5) rather than fixed widths. `PanelLayout.widths` splits whatever width the panel has, with a minimum so a small card next to three large ones stays usable. It's a pure function, so it's tested without SwiftUI.
+
 ## Known limitations
 
 - One display: the notch screen, or the main screen with a virtual notch.
+- Spotify's Web API requires each user to register their own developer app (see README); a published app would register one and ship its Client ID.
 - Music artwork isn't shown (AppleScript artwork access is slow and inconsistent between players).
 - With only the Command Line Tools installed, SwiftPM intermittently fails to load the Swift Testing macro plugin. `scripts/test.sh` retries on that exact error. CI uses full Xcode and isn't affected.

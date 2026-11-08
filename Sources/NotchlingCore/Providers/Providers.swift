@@ -36,6 +36,47 @@ public protocol CalendarProviding: Sendable {
     func observeChanges(_ onChange: @escaping @Sendable () -> Void)
 }
 
+/// Somewhere songs can be searched: the Music library, or Spotify's catalog.
+public protocol SongCatalog: Sendable {
+    func search(_ query: String, limit: Int) async throws -> [SongResult]
+}
+
+/// Searches the local Music library through `MediaProviding`.
+public struct MusicLibraryCatalog: SongCatalog {
+    let media: MediaProviding
+    public init(media: MediaProviding) { self.media = media }
+    public func search(_ query: String, limit: Int) async throws -> [SongResult] {
+        await media.searchLibrary(query, limit: limit)
+    }
+}
+
+/// HTTP, behind a protocol so network code is tested with canned responses.
+public protocol HTTPClient: Sendable {
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse)
+}
+
+public struct URLSessionHTTPClient: HTTPClient {
+    public init() {}
+    public func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+        return (data, http)
+    }
+}
+
+/// Small secrets (tokens) that must not go in UserDefaults.
+public protocol SecretStore: Sendable {
+    func read(_ key: String) -> String?
+    func write(_ value: String, for key: String)
+    func delete(_ key: String)
+}
+
+/// Waits for the browser to come back to the app after signing in.
+public protocol AuthCallbackReceiving: Sendable {
+    /// Listens on `127.0.0.1:port` and returns the first request to `path`, as a full URL.
+    func waitForCallback(port: UInt16, path: String, timeout: Duration) async throws -> URL
+}
+
 public protocol PowerProviding: Sendable {
     func read() -> PowerStatus?
 }

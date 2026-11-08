@@ -7,14 +7,29 @@ import SwiftUI
 /// Composition root: builds the real providers, the stores and the window, and wires them together.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let settings = NotchSettings()
+    private let settings = NotchSettings(
+        spotifyInstalled: NSWorkspace.shared.urlForApplication(withBundleIdentifier: MediaApp.spotify.bundleID) != nil)
     private lazy var reminders = RemindersStore(provider: EventKitRemindersProvider(),
                                                 listID: settings.selectedListID)
     private let focus = FocusTimer()
     private let calendar = CalendarStore(provider: EventKitCalendarProvider())
     private let media: MediaProviding = AppleScriptMediaProvider()
-    private lazy var search = MusicSearch(media: media)
+    private let spotify = SpotifyConnection(http: URLSessionHTTPClient(), secrets: KeychainSecretStore(),
+                                            callbacks: LoopbackCallbackServer(),
+                                            openURL: { NSWorkspace.shared.open($0) })
+    private lazy var search = MusicSearch(
+        media: media,
+        catalogs: [
+            .music: MusicLibraryCatalog(media: media),
+            .spotify: SpotifyCatalog(http: URLSessionHTTPClient(),
+                                     token: { [spotify] in try await spotify.accessToken() },
+                                     invalidateToken: { [spotify] in await spotify.invalidateAccessToken() }),
+        ],
+        source: settings.musicSource)
+    private let weather = WeatherStore(provider: OpenMeteoWeatherProvider())
+    private let notes = NotesStore()
     private var calendarTimer: Timer?
+    private var weatherTimer: Timer?
     private var modelSubscriptions = Set<AnyCancellable>()
     private var model: NotchModel!
     private var panel: NotchPanel!
@@ -54,6 +69,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .environmentObject(focus)
             .environmentObject(calendar)
             .environmentObject(search)
+            .environmentObject(weather)
+            .environmentObject(notes)
         let host = NSHostingView(rootView: root)
         host.wantsLayer = true
         host.layer?.backgroundColor = .clear
@@ -87,6 +104,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .map { $0.allWidgets.contains(where: \.usesCalendar) }
             .removeDuplicates()
             .sink { [weak self] enabled in self?.setCalendarEnabled(enabled) }
+            .store(in: &subscriptions)
+
+        // Weather is only fetched while a weather widget is in the layout.
+        settings.$widgets
+            .map { $0.allWidgets.contains(where: \.usesWeather) }
+            .removeDuplicates()
+            .sink { [weak self] enabled in self?.setWeatherEnabled(enabled) }
+            .store(in: &subscriptions)
+
+        settings.$musicSource
+            .removeDuplicates()
+            .sink { [weak self] source in self?.search.source = source }
             .store(in: &subscriptions)
 
         focus.onFinish = {
@@ -171,6 +200,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 await model.refreshMedia()
                 await reminders.reload()
                 if calendarTimer != nil { await calendar.reload() }
+                if weatherTimer != nil { await weather.refresh() }
             }
         } else {
             search.isOpen = false
@@ -180,6 +210,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel.resignKey()
             NSWorkspace.shared.frontmostApplication?.activate()
         }
+    }
+
+    private func setWeatherEnabled(_ enabled: Bool) {
+        weatherTimer?.invalidate()
+        weatherTimer = nil
+        guard enabled else { return }
+        Task { await weather.refresh() }
+        weatherTimer = Timer.scheduledTimer(withTimeInterval: WeatherStore.maxAge, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                Task { await self.weather.refresh() }
+            }
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        notes.saveNow()
     }
 
     private func setCalendarEnabled(_ enabled: Bool) {
@@ -201,8 +248,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let host = NSHostingView(rootView: SettingsView()
                 .environmentObject(settings)
                 .environmentObject(reminders)
-                .environmentObject(calendar))
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 440, height: 680),
+                .environmentObject(calendar)
+                .environmentObject(weather)
+                .environmentObject(spotify))
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 720),
                                   styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
             window.title = "Notchling Settings"
             window.contentView = host

@@ -1,7 +1,8 @@
 import NotchlingCore
 import SwiftUI
 
-/// The Settings window. Expects `NotchSettings` and `RemindersStore` in the environment.
+/// The Settings window. Expects `NotchSettings`, `RemindersStore`, `CalendarStore`,
+/// `WeatherStore` and `SpotifyConnection` in the environment.
 public struct SettingsView: View {
     @EnvironmentObject var settings: NotchSettings
     @EnvironmentObject var reminders: RemindersStore
@@ -23,6 +24,16 @@ public struct SettingsView: View {
             }
 
             ForEach(WidgetSlot.allCases) { WidgetSlotSection(slot: $0) }
+
+            MusicSettingsSection()
+            if uses(.weather, .weatherCard) { WeatherSettingsSection() }
+            if uses(.worldClock, .worldClockCard) { WorldClockSettingsSection() }
+            if uses(.countdown, .countdownCard) {
+                Section("Countdown") {
+                    TextField("Counting down to", text: $settings.countdownTitle)
+                    DatePicker("Date", selection: $settings.countdownDate, displayedComponents: .date)
+                }
+            }
 
             Section("Calendar") {
                 switch calendar.access {
@@ -57,8 +68,13 @@ public struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 440)
-        .frame(minHeight: 480, idealHeight: 680)
+        .frame(width: 460)
+        .frame(minHeight: 480, idealHeight: 720)
+    }
+
+    /// Options for a widget only show while that widget is in the layout.
+    private func uses(_ kinds: WidgetKind...) -> Bool {
+        !settings.widgets.allWidgets.isDisjoint(with: kinds)
     }
 }
 
@@ -101,6 +117,16 @@ struct WidgetSlotSection: View {
                         Text(kind.summary).font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
+                    if slot == .panel {
+                        Picker("Size of \(kind.title)", selection: Binding(
+                            get: { settings.cardSize(for: kind) },
+                            set: { settings.setCardSize($0, for: kind) })) {
+                            ForEach(CardSize.allCases) { Text($0.label).tag($0).help($0.title) }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .fixedSize()
+                    }
                     rowButton("chevron.up", "Move \(kind.title) earlier", disabled: index == 0) {
                         settings.widgets.move(kind, in: slot, by: -1)
                     }
@@ -129,6 +155,8 @@ struct WidgetSlotSection: View {
         } footer: {
             if slot == .leftWing {
                 Text("Wing widgets show beside the notch when it's closed. Widen the bar above if they're cut off.")
+            } else if slot == .panel {
+                Text("S, M and L set how much of the panel's width each card gets.")
             }
         }
         .animation(.default, value: widgets)
@@ -141,5 +169,142 @@ struct WidgetSlotSection: View {
             .disabled(disabled)
             .help(label)
             .accessibilityLabel(label)
+    }
+}
+
+struct MusicSettingsSection: View {
+    @EnvironmentObject var settings: NotchSettings
+    @EnvironmentObject var spotify: SpotifyConnection
+
+    var body: some View {
+        Section {
+            Picker("Search plays songs in", selection: $settings.musicSource) {
+                Text("Spotify").tag(MediaApp.spotify)
+                Text("Apple Music (your library)").tag(MediaApp.music)
+            }
+            if settings.musicSource == .spotify {
+                spotifyStatus
+                TextField("Spotify Client ID", text: $spotify.clientID)
+                    .font(.system(.body, design: .monospaced))
+                if spotify.status == .needsClientID || spotify.status == .disconnected {
+                    setupSteps
+                }
+            }
+        } header: {
+            Text("Music")
+        } footer: {
+            if settings.musicSource == .spotify {
+                Text("Searching all of Spotify needs a free Spotify developer app, which is how Spotify lets "
+                     + "apps sign in. Your password never goes to Notchling.")
+            }
+        }
+    }
+
+    @ViewBuilder private var spotifyStatus: some View {
+        HStack {
+            switch spotify.status {
+            case .connected:
+                Label("Connected to Spotify", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                Spacer()
+                Button("Disconnect") { spotify.disconnect() }
+            case .connecting:
+                ProgressView().controlSize(.small)
+                Text("Finish signing in in your browser…")
+            case .failed(let message):
+                Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                Spacer()
+                Button("Try again") { Task { await spotify.connect() } }
+            case .disconnected:
+                Text("Not connected")
+                Spacer()
+                Button("Connect Spotify") { Task { await spotify.connect() } }
+                    .buttonStyle(.borderedProminent)
+            case .needsClientID:
+                Text("Paste a Client ID below to connect").foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var setupSteps: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("One-time setup").font(.headline)
+            Text("1. Open the Spotify developer dashboard and create an app.")
+            Text("2. Add this Redirect URI and tick “Web API”:")
+            HStack {
+                Text(SpotifyAuth.redirectURI).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+                Button("Copy") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(SpotifyAuth.redirectURI, forType: .string)
+                }
+                .controlSize(.small)
+            }
+            Text("3. Copy the app's Client ID into the field above, then Connect.")
+            Link("Open the Spotify developer dashboard",
+                 destination: URL(string: "https://developer.spotify.com/dashboard")!)
+        }
+        .font(.callout)
+    }
+}
+
+struct WeatherSettingsSection: View {
+    @EnvironmentObject var weather: WeatherStore
+
+    var body: some View {
+        Section("Weather") {
+            HStack {
+                Text("City")
+                Spacer()
+                Text(weather.place.map { "\($0.name)\($0.region.isEmpty ? "" : ", \($0.region)")" } ?? "Not set")
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            TextField("Search for a city", text: $weather.placeQuery)
+            ForEach(weather.placeResults) { place in
+                Button { weather.choose(place) } label: {
+                    VStack(alignment: .leading) {
+                        Text(place.name)
+                        Text(place.region).font(.caption).foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            Picker("Units", selection: $weather.unit) {
+                ForEach(TemperatureUnit.allCases) { Text($0.symbol).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            Text("Weather from Open-Meteo. Only the city's location is sent.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
+struct WorldClockSettingsSection: View {
+    @EnvironmentObject var settings: NotchSettings
+
+    var body: some View {
+        Section {
+            ForEach(settings.worldClockZones, id: \.self) { id in
+                HStack {
+                    Text(WorldClock.cityName(for: id))
+                    Text(id).font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button { settings.removeWorldClock(id) } label: { Image(systemName: "minus.circle.fill") }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Remove \(WorldClock.cityName(for: id))")
+                }
+            }
+            if settings.worldClockZones.count < WorldClock.maxCities {
+                Picker("Add a city", selection: Binding(get: { "" }, set: { settings.addWorldClock($0) })) {
+                    Text("Choose…").tag("")
+                    ForEach(WorldClock.allZones, id: \.id) { Text($0.label).tag($0.id) }
+                }
+            }
+        } header: {
+            Text("World clocks")
+        } footer: {
+            Text("Up to \(WorldClock.maxCities) cities. The wing shows the first one.")
+        }
     }
 }

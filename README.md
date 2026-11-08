@@ -5,9 +5,10 @@ A macOS menu-bar companion that turns the dead space around the MacBook camera n
 - **Collapsed:** slim black "wings" extend the notch and show what's playing (or the date), your open reminders count, the time, and battery.
 - **Hover the notch:** a panel drops down with music controls and your **Apple Reminders**, synced both ways: add or tick off a reminder here and it updates on your iPhone.
 - **Pick your widgets.** Choose what goes on the left of the notch, the right, and in the panel, and in what order:
-  - **Beside the notch:** now playing, date, time, battery, open reminders, focus timer, next calendar event
-  - **In the panel:** music, Reminders, focus timer, Calendar, a Today tile
-- **Music:** play/pause/skip, **loop** (song or playlist), and **search your Music library** to play a song. Songs outside your library open in Spotify's search.
+  - **Beside the notch:** now playing, date, time, battery, open reminders, focus timer, next calendar event, weather, world clock, countdown
+  - **In the panel (up to 4 cards):** music, Reminders, focus timer, Calendar, weather, world clocks, countdown, notes, a Today tile
+- **Size each card:** Small, Medium or Large, and make the whole panel up to 900×420 pt.
+- **Music, Spotify first:** play/pause/skip, **loop**, and **search all of Spotify** to play any song (after a one-time sign-in, below). Can search your Apple Music library instead.
 - **Focus timer:** 5/15/25/50-minute sessions with a progress ring, a chime when done, and the time left shown beside the notch.
 - **Calendar:** your next event ("Standup 12m") beside the notch, and the rest of today in the panel.
 - **Everything else is adjustable** in Settings: wing width (down to zero), panel size, which Reminders list, haptics, and open at login.
@@ -28,6 +29,16 @@ make lint     # SwiftLint (needs `brew install swiftlint`)
 ```
 
 On first use, macOS asks for permission to access Reminders and Calendar and to control Music/Spotify.
+
+### Connect Spotify (for song search)
+
+Spotify only lets apps search its catalog after you sign in through a Spotify developer app of your own. It's free and takes two minutes:
+
+1. Go to [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard) and **Create app** (any name).
+2. Add the Redirect URI `http://127.0.0.1:43821/callback` and tick **Web API**.
+3. Copy the app's **Client ID** into Notchling → Settings → Music, then click **Connect Spotify** and approve in your browser.
+
+Notchling uses Spotify's PKCE sign-in, so there's no client secret in the app and your password only ever goes to Spotify. It stores just a refresh token, in your Keychain. Songs play in the Spotify desktop app.
 
 ### Keep permissions between builds
 
@@ -58,7 +69,7 @@ The architecture, and why it's built this way, is written up in [docs/ARCHITECTU
 
 ## Testing
 
-The core module is covered by 78 unit tests: layout geometry, the widget layout and its migration, the focus timer, calendar labels, music search, date labels, sorting, AppleScript/IOKit parsing, settings persistence, and the reminders sync behaviour. The sync tests run against `FakeRemindersProvider`, so they need no permissions and touch none of your real data.
+The core module is covered by 123 tests: layout geometry, the widget layout and its migration, card sizing, the focus timer, calendar labels, music search, the Spotify sign-in (including a real loopback-server test), weather parsing and caching, world clocks, date labels, sorting, AppleScript/IOKit parsing, settings persistence, and the reminders sync behaviour. The sync tests run against `FakeRemindersProvider`, so they need no permissions and touch none of your real data.
 
 ```bash
 make test
@@ -69,7 +80,7 @@ make test
 - [ ] Screenshot / demo GIF in this README
 - [ ] Developer ID signing, notarization and a `.dmg` release in CI
 - [ ] Auto-updates (Sparkle)
-- [ ] Play any song (Apple Music catalog via MusicKit, or Spotify Web API with sign-in)
+- [ ] Apple Music catalog search (MusicKit)
 - [ ] Multiple displays: follow the active screen
 - [ ] Hide automatically over full-screen video
 - [ ] Snapshot tests for the SwiftUI views

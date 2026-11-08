@@ -58,7 +58,14 @@ struct WingWidgetView: View {
                 }
                 .accessibilityElement(children: .combine)
             }
-        case .musicCard, .remindersCard, .dayCard, .focusCard, .calendarCard:
+        case .weather:
+            WeatherWing()
+        case .worldClock:
+            WorldClockWing(now: model.now, wingWidth: wingWidth)
+        case .countdown:
+            CountdownWing(now: model.now)
+        case .musicCard, .remindersCard, .dayCard, .focusCard, .calendarCard, .weatherCard, .worldClockCard,
+             .countdownCard, .notesCard:
             EmptyView()   // panel-only; `WidgetLayout` never puts these in a wing
         }
     }
@@ -92,6 +99,10 @@ struct PanelWidgetView: View {
         case .dayCard: DayCard(now: model.now)
         case .focusCard: FocusCard(now: model.now)
         case .calendarCard: CalendarCard(now: model.now)
+        case .weatherCard: WeatherCard()
+        case .worldClockCard: WorldClockCard(now: model.now)
+        case .countdownCard: CountdownCard(now: model.now)
+        case .notesCard: NotesCard()
         default: EmptyView()   // wing-only
         }
     }

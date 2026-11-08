@@ -95,7 +95,8 @@ struct SongSearchView: View {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").font(.system(size: 9, weight: .bold))
                     .foregroundStyle(.white.opacity(0.5))
-                TextField("Song or artist", text: $search.query)
+                TextField(search.source == .spotify ? "Search Spotify" : "Search your Music library",
+                          text: $search.query)
                     .textFieldStyle(.plain)
                     .font(.system(size: 11))
                     .focused($fieldFocused)
@@ -121,10 +122,16 @@ struct SongSearchView: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel("Play \(song.title) by \(song.artist)")
                     }
-                    if search.hasSearched && search.results.isEmpty {
-                        Text("Not in your Music library").font(.system(size: 10)).foregroundStyle(.white.opacity(0.4))
+                    if let error = search.errorMessage {
+                        Text(error).font(.system(size: 10)).foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    if search.canSearchSpotify && !search.trimmedQuery.isEmpty {
+                    if search.hasSearched && search.results.isEmpty {
+                        Text("No songs found").font(.system(size: 10)).foregroundStyle(.white.opacity(0.4))
+                    }
+                    // Fallback when Spotify search isn't connected: open the query in the Spotify app.
+                    if search.canSearchSpotify && !search.trimmedQuery.isEmpty
+                        && (search.source == .music || search.errorMessage != nil) {
                         Button { search.searchSpotify() } label: {
                             Label("Search Spotify for “\(search.trimmedQuery)”", systemImage: "arrow.up.right")
                                 .font(.system(size: 10, weight: .semibold))

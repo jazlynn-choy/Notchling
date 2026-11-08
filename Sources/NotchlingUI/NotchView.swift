@@ -101,25 +101,18 @@ struct ExpandedView: View {
                         .font(.system(size: 11)).foregroundStyle(.white.opacity(0.5))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                // Compact cards keep a fixed width and flexible ones share what's left.
-                // With no flexible card, everything shares equally.
-                let anyFlexible = cards.contains(where: \.isFlexible)
-                ForEach(cards) { kind in
-                    let fixed = anyFlexible && !kind.isFlexible ? compactWidth(for: kind) : nil
+                // Each card's share of the width comes from its size (S/M/L) in Settings.
+                let widths = PanelLayout.widths(for: cards.map(settings.cardSize(for:)),
+                                                totalWidth: geometry.expandedSize.width - 28,
+                                                spacing: 10)
+                ForEach(Array(zip(cards, widths)), id: \.0) { kind, width in
                     PanelWidgetView(kind: kind, model: model)
-                        .frame(minWidth: fixed, maxWidth: fixed ?? .infinity)
+                        .frame(width: width)
                 }
             }
             .padding(.horizontal, 14)
             .padding(.bottom, 12)
             .frame(maxHeight: .infinity, alignment: .top)
-        }
-    }
-
-    private func compactWidth(for kind: WidgetKind) -> CGFloat {
-        switch kind {
-        case .dayCard: return 104
-        default: return min(210, geometry.expandedSize.width * 0.45)
         }
     }
 }

@@ -18,7 +18,7 @@ public enum WidgetSlot: String, CaseIterable, Identifiable, Sendable {
     public var capacity: Int {
         switch self {
         case .leftWing, .rightWing: return 4
-        case .panel: return 3
+        case .panel: return 4
         }
     }
 
@@ -39,12 +39,19 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
     case reminderCount = "reminderCount"
     case focusTimer = "focusTimer"
     case nextEvent = "nextEvent"
+    case weather = "weather"
+    case worldClock = "worldClock"
+    case countdown = "countdown"
     // Panel widgets
     case musicCard = "musicCard"
     case remindersCard = "remindersCard"
     case dayCard = "dayCard"
     case focusCard = "focusCard"
     case calendarCard = "calendarCard"
+    case weatherCard = "weatherCard"
+    case worldClockCard = "worldClockCard"
+    case countdownCard = "countdownCard"
+    case notesCard = "notesCard"
 
     public var id: String { rawValue }
 
@@ -56,13 +63,17 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
         case .time: return "Time"
         case .battery: return "Battery"
         case .reminderCount: return "Open reminders count"
+        case .focusTimer, .focusCard: return "Focus timer"
+        case .nextEvent: return "Next event"
+        case .weather, .weatherCard: return "Weather"
+        case .worldClock: return "World clock"
+        case .worldClockCard: return "World clocks"
+        case .countdown, .countdownCard: return "Countdown"
         case .musicCard: return "Music controls"
         case .remindersCard: return "Reminders"
         case .dayCard: return "Today"
-        case .focusTimer: return "Focus timer"
-        case .nextEvent: return "Next event"
-        case .focusCard: return "Focus timer"
         case .calendarCard: return "Calendar"
+        case .notesCard: return "Notes"
         }
     }
 
@@ -74,13 +85,20 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
         case .time: return "Current time"
         case .battery: return "Battery level, green while charging"
         case .reminderCount: return "A badge with how many reminders are open"
-        case .musicCard: return "Song, artist and play controls for Music or Spotify"
-        case .remindersCard: return "Your Apple Reminders: tick off or add new ones"
-        case .dayCard: return "A calendar tile for today's date"
         case .focusTimer: return "Time left, while a focus session is running"
         case .nextEvent: return "Your next meeting and how soon it starts"
+        case .weather: return "Temperature and an icon for your city"
+        case .worldClock: return "The time in your first world-clock city"
+        case .countdown: return "Days left until your countdown date"
+        case .musicCard: return "Song, controls, loop and search for Spotify or Music"
+        case .remindersCard: return "Your Apple Reminders: tick off or add new ones"
+        case .dayCard: return "A calendar tile for today's date"
         case .focusCard: return "Start, pause and pick a length for a focus session"
         case .calendarCard: return "The rest of today's events from Calendar"
+        case .weatherCard: return "Conditions, temperature and today's high and low"
+        case .worldClockCard: return "The time in up to three cities"
+        case .countdownCard: return "A big day count to the date you choose"
+        case .notesCard: return "A scratchpad that's saved as you type"
         }
     }
 
@@ -96,26 +114,74 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
         case .remindersCard: return "checklist"
         case .focusTimer, .focusCard: return "timer"
         case .nextEvent, .calendarCard: return "calendar.badge.clock"
+        case .weather, .weatherCard: return "cloud.sun"
+        case .worldClock, .worldClockCard: return "globe"
+        case .countdown, .countdownCard: return "hourglass"
+        case .notesCard: return "note.text"
         }
     }
 
     public func fits(_ slot: WidgetSlot) -> Bool {
         switch self {
-        case .nowPlaying, .nowPlayingOrDate, .date, .time, .battery, .reminderCount, .focusTimer, .nextEvent:
+        case .nowPlaying, .nowPlayingOrDate, .date, .time, .battery, .reminderCount, .focusTimer, .nextEvent,
+             .weather, .worldClock, .countdown:
             return slot.isWing
-        case .musicCard, .remindersCard, .dayCard, .focusCard, .calendarCard:
+        case .musicCard, .remindersCard, .dayCard, .focusCard, .calendarCard, .weatherCard, .worldClockCard,
+             .countdownCard, .notesCard:
             return slot == .panel
         }
     }
 
-    /// Whether a panel card stretches to fill leftover width (true) or keeps a compact width.
-    public var isFlexible: Bool { self == .remindersCard || self == .calendarCard }
+    /// How wide a panel card starts out. Users can change it per card.
+    public var defaultCardSize: CardSize {
+        switch self {
+        case .remindersCard, .calendarCard: return .large
+        case .musicCard, .notesCard, .worldClockCard: return .medium
+        default: return .small
+        }
+    }
 
     /// Whether this widget needs now-playing information, so polling can stop when none does.
     public var usesMedia: Bool { [.nowPlaying, .nowPlayingOrDate, .musicCard].contains(self) }
 
     /// Whether this widget reads Calendar, so the app only touches EventKit events when needed.
     public var usesCalendar: Bool { self == .nextEvent || self == .calendarCard }
+
+    /// Whether this widget needs the weather, so the app only calls the network when needed.
+    public var usesWeather: Bool { self == .weather || self == .weatherCard }
+}
+
+/// How much of the panel's width a card takes, relative to the other cards.
+public enum CardSize: String, CaseIterable, Identifiable, Sendable {
+    case small, medium, large
+
+    public var id: String { rawValue }
+    public var label: String { rawValue.prefix(1).uppercased() }
+    public var title: String { rawValue.capitalized }
+
+    /// Share of the width. A large card is 2.5× a small one.
+    public var weight: Double {
+        switch self {
+        case .small: return 1
+        case .medium: return 1.6
+        case .large: return 2.5
+        }
+    }
+}
+
+/// Splits the panel's width between cards by their size.
+public enum PanelLayout {
+    /// Widths for cards of `sizes`, filling `totalWidth` with `spacing` between them. Every
+    /// card gets at least `minimum` (if there's room), so a small card can't be squeezed to nothing.
+    public static func widths(for sizes: [CardSize], totalWidth: Double, spacing: Double,
+                              minimum: Double = 90) -> [Double] {
+        guard !sizes.isEmpty else { return [] }
+        let available = max(0, totalWidth - spacing * Double(sizes.count - 1))
+        let floor = min(minimum, available / Double(sizes.count))
+        let extra = available - floor * Double(sizes.count)
+        let totalWeight = sizes.reduce(0) { $0 + $1.weight }
+        return sizes.map { floor + extra * $0.weight / totalWeight }
+    }
 }
 
 /// Which widgets appear in each slot, in display order.

@@ -1,10 +1,7 @@
 import Foundation
 
-/// Search-as-you-type over the Music library, shown inside the music card.
-///
-/// Playing *any* song (not just ones in your library) would need Apple's MusicKit with a
-/// developer token, or Spotify's Web API with a login. Neither is possible from a scripting
-/// bridge, so songs outside the library go to Spotify's own search instead.
+/// Search-as-you-type inside the music card, over Spotify's catalog (when signed in) or the
+/// Music library. Results play in the matching app.
 @MainActor
 public final class MusicSearch: ObservableObject {
     @Published public var isOpen = false {
@@ -17,18 +14,28 @@ public final class MusicSearch: ObservableObject {
     @Published public private(set) var isSearching = false
     /// True once a search for the current query has finished, so the UI can say "no matches".
     @Published public private(set) var hasSearched = false
+    /// Why the last search failed, e.g. "Connect Spotify in Settings…".
+    @Published public private(set) var errorMessage: String?
+    /// Where searches go. Changing it re-runs the current query.
+    @Published public var source: MediaApp {
+        didSet { if source != oldValue { scheduleSearch() } }
+    }
     public let canSearchSpotify: Bool
 
     /// Called after a song starts, so the now-playing card can refresh.
     public var onPlay: (() -> Void)?
 
     private let media: MediaProviding
+    private var catalogs: [MediaApp: SongCatalog]
     private let debounce: Duration
     private let limit: Int
     private var searchTask: Task<Void, Never>?
 
-    public init(media: MediaProviding, debounce: Duration = .milliseconds(300), limit: Int = 8) {
+    public init(media: MediaProviding, catalogs: [MediaApp: SongCatalog]? = nil, source: MediaApp = .music,
+                debounce: Duration = .milliseconds(300), limit: Int = 8) {
         self.media = media
+        self.catalogs = catalogs ?? [.music: MusicLibraryCatalog(media: media)]
+        self.source = source
         self.debounce = debounce
         self.limit = limit
         self.canSearchSpotify = media.isSpotifyInstalled
@@ -58,21 +65,29 @@ public final class MusicSearch: ObservableObject {
         searchTask?.cancel()
         let query = trimmedQuery
         hasSearched = false
-        guard !query.isEmpty else {
+        errorMessage = nil
+        guard !query.isEmpty, let catalog = catalogs[source] else {
             results = []
             isSearching = false
             return
         }
-        let media = media, debounce = debounce, limit = limit
+        let debounce = debounce, limit = limit
         searchTask = Task { [weak self] in
             try? await Task.sleep(for: debounce)
             guard !Task.isCancelled else { return }
             self?.isSearching = true
-            let found = await media.searchLibrary(query, limit: limit)
+            let outcome: Result<[SongResult], Error>
+            do { outcome = .success(try await catalog.search(query, limit: limit)) } catch { outcome = .failure(error) }
             guard !Task.isCancelled, let self else { return }
-            results = found
+            switch outcome {
+            case .success(let found):
+                results = found
+                hasSearched = true
+            case .failure(let error):
+                results = []
+                errorMessage = error.localizedDescription
+            }
             isSearching = false
-            hasSearched = true
         }
     }
 
