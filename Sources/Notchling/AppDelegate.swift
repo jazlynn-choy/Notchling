@@ -32,6 +32,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var agents = AgentStatusStore(
         source: DirectoryAgentEventSource(directory: hookSetup.installer.eventsDirectory))
     private var agentTimer: Timer?
+    private let editor = PanelEditor()
+    private var spotifyTimer: Timer?
     private var calendarTimer: Timer?
     private var weatherTimer: Timer?
     private var modelSubscriptions = Set<AnyCancellable>()
@@ -51,6 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         buildPanel()
         observe()
         Task { await reminders.reload() }
+        keepSpotifyConnected()
     }
 
     /// (Re)creates the live model and everything that listens to it.
@@ -58,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         modelSubscriptions = []
         model = NotchModel(notchSize: notchSize, media: media, power: IOKitPowerProvider())
         model.mediaEnabled = settings.widgets.allWidgets.contains(where: \.usesMedia)
+        model.preferredApp = settings.musicSource
         model.start()
         // The focus timer checks for "done" on the same 1-second clock the UI uses.
         model.$now
@@ -76,6 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .environmentObject(weather)
             .environmentObject(notes)
             .environmentObject(agents)
+            .environmentObject(editor)
         let host = NSHostingView(rootView: root)
         host.wantsLayer = true
         host.layer?.backgroundColor = .clear
@@ -132,7 +137,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         settings.$musicSource
             .removeDuplicates()
-            .sink { [weak self] source in self?.search.source = source }
+            .sink { [weak self] source in
+                self?.search.source = source
+                self?.model.preferredApp = source
+            }
             .store(in: &subscriptions)
 
         focus.onFinish = {
@@ -221,6 +229,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         } else {
             search.isOpen = false
+            editor.isEditing = false
         }
         if !expanded && panel.isKeyWindow {
             // Hand the keyboard back to whatever app the user was typing in.
@@ -238,6 +247,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 Task { await self.weather.refresh() }
+            }
+        }
+    }
+
+    /// Checks the Spotify sign-in at launch, after every wake from sleep, and every 30 minutes,
+    /// renewing it before it can lapse.
+    private func keepSpotifyConnected() {
+        Task { await spotify.keepAlive() }
+        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                Task { await self.spotify.keepAlive() }
+            }
+            .store(in: &subscriptions)
+        spotifyTimer = Timer.scheduledTimer(withTimeInterval: 30 * 60, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                Task { await self.spotify.keepAlive() }
             }
         }
     }

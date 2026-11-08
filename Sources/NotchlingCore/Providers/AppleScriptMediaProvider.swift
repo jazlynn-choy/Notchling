@@ -29,6 +29,11 @@ public struct AppleScriptMediaProvider: MediaProviding {
         _ = Self.run("tell application \"\(app.rawValue)\" to \(command.rawValue)")
     }
 
+    public func resume(_ app: MediaApp) async {
+        // An explicit tap on play, so opening the player is what the user asked for.
+        _ = Self.run("tell application \"\(app.rawValue)\" to play")
+    }
+
     public func setRepeat(_ mode: RepeatMode, for app: MediaApp) async {
         switch app {
         case .music:
@@ -68,10 +73,13 @@ public struct AppleScriptMediaProvider: MediaProviding {
         switch song.app {
         case .music:
             command = "tell application \"Music\" to play (first track of library playlist 1 whose persistent ID is (item 1 of argv))"
+        case .spotify where song.contextURI != nil:
+            // Playing the track inside its album means the album keeps going afterwards.
+            command = "tell application \"Spotify\" to play track (item 1 of argv) in context (item 2 of argv)"
         case .spotify:
             command = "tell application \"Spotify\" to play track (item 1 of argv)"
         }
-        _ = Self.run("on run argv\n\(command)\nend run", arguments: [song.id])
+        _ = Self.run("on run argv\n\(command)\nend run", arguments: [song.id] + (song.contextURI.map { [$0] } ?? []))
     }
 
     public func openSpotifySearch(_ query: String) async {
@@ -92,8 +100,8 @@ public struct AppleScriptMediaProvider: MediaProviding {
 
     static func statusScript(for app: MediaApp) -> String {
         let repeatValue = app == .music
-            ? "(song repeat as string)"
-            : "(my spotifyRepeat(repeating))"
+            ? "(song repeat as string) & sep & \"\""
+            : "(my spotifyRepeat(repeating)) & sep & (artwork url of current track)"
         return """
         on spotifyRepeat(flag)
             if flag then return "all"
@@ -107,12 +115,14 @@ public struct AppleScriptMediaProvider: MediaProviding {
         """
     }
 
-    /// Turns `"playing␟Title␟Artist␟all"` into a `Track`. Public for tests.
+    /// Turns `"playing␟Title␟Artist␟all␟https://…"` into a `Track`. The artwork field is
+    /// optional and may be empty. Public for tests.
     public static func parseStatus(_ output: String, app: MediaApp) -> Track? {
         let parts = output.components(separatedBy: separator)
-        guard parts.count == 4, ["playing", "paused"].contains(parts[0]) else { return nil }
+        guard (4...5).contains(parts.count), ["playing", "paused"].contains(parts[0]) else { return nil }
+        let artwork = parts.count == 5 ? URL(string: parts[4]).flatMap { $0.scheme == "https" ? $0 : nil } : nil
         return Track(title: parts[1], artist: parts[2], app: app, isPlaying: parts[0] == "playing",
-                     repeatMode: RepeatMode(rawValue: parts[3]) ?? .off)
+                     repeatMode: RepeatMode(rawValue: parts[3]) ?? .off, artworkURL: artwork)
     }
 
     /// Turns `"id␟Title␟Artist␞id␟…␞"` into results, skipping malformed records. Public for tests.

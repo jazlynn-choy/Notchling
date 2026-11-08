@@ -116,8 +116,16 @@ Searching Spotify's catalog needs a Web API token. Notchling uses **Authorizatio
 ### 13. Network widgets fail soft
 Weather comes from Open-Meteo (no key, no account), is cached for 20 minutes, and is only fetched while a weather widget is in the layout. A failed update keeps showing the last report with a small error, rather than blanking the widget (tested). All network access goes through an `HTTPClient` protocol, so parsing and error paths are tested with fixtures trimmed from real responses.
 
-### 14. Card sizes are weights
-Panel cards are Small, Medium or Large, which are weights (1, 1.6, 2.5) rather than fixed widths. `PanelLayout.widths` splits whatever width the panel has, with a minimum so a small card next to three large ones stays usable. It's a pure function, so it's tested without SwiftUI.
+### 14. Card sizes are weights, and editing is pure math
+Each panel card has a *weight* (its share of the width) rather than a fixed width, so a layout still works when the panel itself is resized. `PanelLayout.widths` splits the width, with a minimum so a narrow card next to wide ones stays usable.
+
+In edit mode, the hard parts are pure functions, tested without SwiftUI:
+- **Resizing** works out the weight that makes the dragged card exactly as wide as the pointer asks, with the others unchanged, so the handle stays under the cursor. It's tested for every position. The drag uses global coordinates, because the card's own frame changes as it resizes, which would otherwise feed back into the gesture.
+- **Reordering** moves a card past a neighbour once its centre crosses the neighbour's centre, the same rule as iOS home screens.
+- Saved sizes from the previous S/M/L version still load. A "small" string becomes weight 1.
+
+### 16. Staying signed in to Spotify
+The access token lasts an hour. `keepAlive()` runs at launch, after every wake from sleep, and every 30 minutes, renewing the token once it's within 20 minutes of expiring. Being offline never signs you out; only Spotify rejecting the refresh token does, and then the UI says so instead of failing silently. Spotify can rotate refresh tokens, so the newest is always saved (tested).
 
 ### 15. Claude Code status through hooks
 Claude Code runs configured commands on lifecycle events (`SessionStart`, `PreToolUse`, `Notification`, `Stop`…), passing the event as JSON on stdin. Notchling installs one small `sh` script as that command:

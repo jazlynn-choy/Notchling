@@ -56,13 +56,28 @@ public struct SpotifyCatalog: SongCatalog {
                 let uri: String
                 let name: String
                 let artists: [Artist]
+                let album: Album?
             }
             struct Artist: Decodable { let name: String }
+            struct Album: Decodable {
+                let uri: String?
+                let images: [Image]?
+            }
+            struct Image: Decodable {
+                let url: String
+                let width: Int?
+            }
             let tracks: Tracks
         }
-        return try JSONDecoder().decode(Response.self, from: data).tracks.items.map {
-            SongResult(id: $0.uri, title: $0.name, artist: $0.artists.map(\.name).joined(separator: ", "),
-                       app: .spotify)
+        return try JSONDecoder().decode(Response.self, from: data).tracks.items.map { item in
+            // Smallest cover that's still sharp at 2x for a 28 pt thumbnail.
+            let image = item.album?.images?
+                .sorted { ($0.width ?? 0) < ($1.width ?? 0) }
+                .first { ($0.width ?? 0) >= 60 } ?? item.album?.images?.first
+            return SongResult(id: item.uri, title: item.name,
+                              artist: item.artists.map(\.name).joined(separator: ", "),
+                              app: .spotify, contextURI: item.album?.uri,
+                              artworkURL: image.flatMap { URL(string: $0.url) })
         }
     }
 }

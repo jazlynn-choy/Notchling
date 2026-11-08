@@ -63,6 +63,17 @@ struct SpotifyAuthTests {
         #expect(results.first?.id == "spotify:track:1")
     }
 
+    @Test func searchResultsCarryTheAlbumSoItKeepsPlaying() throws {
+        let json = #"""
+        {"tracks":{"items":[{"uri":"spotify:track:1","name":"Venom","artists":[{"name":"Little Simz"}],
+          "album":{"uri":"spotify:album:9","images":[
+            {"url":"https://i/640","width":640},{"url":"https://i/300","width":300},{"url":"https://i/64","width":64}]}}]}}
+        """#
+        let song = try #require(try SpotifyCatalog.parseSearch(Data(json.utf8)).first)
+        #expect(song.contextURI == "spotify:album:9")
+        #expect(song.artworkURL?.absoluteString == "https://i/64")
+    }
+
     @Test func requestTargetParsing() {
         #expect(LoopbackCallbackServer.requestTarget(fromRequest: Data("GET /callback?code=1 HTTP/1.1\r\nHost: x\r\n\r\n".utf8))
                 == "/callback?code=1")
@@ -153,8 +164,32 @@ struct SpotifyConnectionTests {
         http.handler = { _ in (400, #"{"error":"invalid_grant"}"#) }
         let spotify = make()
         await #expect(throws: SpotifyError.notConnected) { try await spotify.accessToken() }
-        #expect(spotify.status == .disconnected)
+        #expect(spotify.status == .failed(SpotifyConnection.signedOutMessage))
         #expect(secrets.values.isEmpty)
+    }
+
+    @Test func keepAliveRenewsEarlyButNotOnEveryCall() async throws {
+        secrets.values[SpotifyConnection.refreshTokenKey] = "R1"
+        var issued = 0
+        http.handler = { _ in
+            issued += 1
+            return (200, #"{"access_token":"A\#(issued)","expires_in":3600,"refresh_token":"R\#(issued + 1)"}"#)
+        }
+        let spotify = make()
+        await spotify.keepAlive()   // launch: validates by refreshing once
+        await spotify.keepAlive()   // still fresh: no request
+        #expect(http.requests.count == 1)
+        #expect(spotify.status == .connected)
+        #expect(secrets.values[SpotifyConnection.refreshTokenKey] == "R2")   // rotated token kept
+    }
+
+    @Test func beingOfflineDoesNotSignOut() async {
+        secrets.values[SpotifyConnection.refreshTokenKey] = "R1"
+        http.handler = { _ in throw URLError(.notConnectedToInternet) }
+        let spotify = make()
+        await spotify.keepAlive()
+        #expect(spotify.status == .connected)
+        #expect(secrets.values[SpotifyConnection.refreshTokenKey] == "R1")
     }
 
     @Test func changingClientIDSignsOut() {

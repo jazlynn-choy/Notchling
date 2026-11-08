@@ -49,13 +49,17 @@ public struct Track: Equatable, Sendable {
     public var app: MediaApp
     public var isPlaying: Bool
     public var repeatMode: RepeatMode
+    /// Album cover (Spotify provides one; Music's scripting doesn't expose a URL).
+    public var artworkURL: URL?
 
-    public init(title: String, artist: String, app: MediaApp, isPlaying: Bool, repeatMode: RepeatMode = .off) {
+    public init(title: String, artist: String, app: MediaApp, isPlaying: Bool, repeatMode: RepeatMode = .off,
+                artworkURL: URL? = nil) {
         self.title = title
         self.artist = artist
         self.app = app
         self.isPlaying = isPlaying
         self.repeatMode = repeatMode
+        self.artworkURL = artworkURL
     }
 }
 
@@ -81,12 +85,18 @@ public struct SongResult: Identifiable, Equatable, Sendable {
     public let artist: String
     /// Which app can play it.
     public let app: MediaApp
+    /// What to keep playing after it: the album's Spotify URI, so the album carries on.
+    public let contextURI: String?
+    public let artworkURL: URL?
 
-    public init(id: String, title: String, artist: String, app: MediaApp = .music) {
+    public init(id: String, title: String, artist: String, app: MediaApp = .music,
+                contextURI: String? = nil, artworkURL: URL? = nil) {
         self.id = id
         self.title = title
         self.artist = artist
         self.app = app
+        self.contextURI = contextURI
+        self.artworkURL = artworkURL
     }
 }
 

@@ -33,6 +33,16 @@ struct ProviderParsingTests {
         #expect(track?.repeatMode == expected)
     }
 
+    @Test func spotifyStatusIncludesAlbumArt() {
+        let output = "playing\(sep)Venom\(sep)Little Simz\(sep)off\(sep)https://i.scdn.co/image/abc"
+        let track = AppleScriptMediaProvider.parseStatus(output, app: .spotify)
+        #expect(track?.artworkURL?.absoluteString == "https://i.scdn.co/image/abc")
+        // Music sends an empty artwork field; a non-https value is ignored.
+        #expect(AppleScriptMediaProvider.parseStatus("paused\(sep)S\(sep)A\(sep)off\(sep)", app: .music)?.artworkURL == nil)
+        #expect(AppleScriptMediaProvider.parseStatus("paused\(sep)S\(sep)A\(sep)off\(sep)file:///etc", app: .music)?
+            .artworkURL == nil)
+    }
+
     @Test func parsesSearchResultsAndSkipsBrokenRecords() {
         let rs = AppleScriptMediaProvider.recordSeparator
         let output = "A1\(sep)Espresso\(sep)Sabrina Carpenter\(rs)broken\(rs)\(sep)No ID\(sep)X\(rs)B2\(sep)Juno\(sep)Sabrina Carpenter\(rs)"

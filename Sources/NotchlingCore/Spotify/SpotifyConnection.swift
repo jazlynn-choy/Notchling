@@ -99,10 +99,21 @@ public final class SpotifyConnection: ObservableObject {
         status = clientID.isEmpty ? .needsClientID : .disconnected
     }
 
-    /// A valid access token, refreshing it first if it expires within a minute.
-    public func accessToken() async throws -> String {
+    /// Message shown when Spotify itself ends the sign-in (revoked, or the app was removed).
+    public static let signedOutMessage = "Spotify signed Notchling out. Click Connect to sign in again."
+
+    /// Checks the saved sign-in still works, and renews it early so it never lapses. Run at
+    /// launch, after the Mac wakes, and on a timer. Being offline is not a reason to sign out:
+    /// only Spotify rejecting the refresh token is.
+    public func keepAlive() async {
+        guard tokens != nil else { return }
+        _ = try? await accessToken(minimumValidity: 20 * 60)
+    }
+
+    /// A valid access token, refreshed first if it expires within `minimumValidity` seconds.
+    public func accessToken(minimumValidity: TimeInterval = 60) async throws -> String {
         guard let current = tokens else { throw SpotifyError.notConnected }
-        if current.expiresAt > clock().addingTimeInterval(60) { return current.accessToken }
+        if current.expiresAt > clock().addingTimeInterval(minimumValidity) { return current.accessToken }
         if let refreshTask { return try await refreshTask.value.accessToken }
 
         let request = SpotifyAuth.tokenRequest(["grant_type": "refresh_token",
@@ -120,11 +131,14 @@ public final class SpotifyConnection: ObservableObject {
         do {
             let fresh = try await task.value
             tokens = fresh
+            // Spotify may rotate the refresh token; always keep the newest one.
             secrets.write(fresh.refreshToken, for: Self.refreshTokenKey)
+            if status != .connected { status = .connected }
             return fresh.accessToken
         } catch SpotifyError.notConnected {
             // The refresh token was revoked (e.g. removed in Spotify's account page).
             disconnect()
+            status = .failed(Self.signedOutMessage)
             throw SpotifyError.notConnected
         }
     }

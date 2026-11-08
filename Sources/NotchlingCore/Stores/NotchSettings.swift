@@ -42,10 +42,10 @@ public final class NotchSettings: ObservableObject {
     @Published public var haptics: Bool {
         didSet { defaults.set(haptics, forKey: Key.haptics) }
     }
-    /// Per-card size overrides. Cards not listed use `WidgetKind.defaultCardSize`.
-    @Published public private(set) var cardSizes: [WidgetKind: CardSize] {
+    /// Per-card width weights the user has set. Cards not listed use their default size.
+    @Published public private(set) var cardWeights: [WidgetKind: Double] {
         didSet {
-            let raw = Dictionary(uniqueKeysWithValues: cardSizes.map { ($0.key.rawValue, $0.value.rawValue) })
+            let raw = Dictionary(uniqueKeysWithValues: cardWeights.map { ($0.key.rawValue, $0.value) })
             defaults.set(raw, forKey: Key.cardSizes)
         }
     }
@@ -91,10 +91,14 @@ public final class NotchSettings: ObservableObject {
         panelWidth = defaults.double(forKey: Key.panelWidth).clamped(to: Self.panelWidthRange)
         panelHeight = defaults.double(forKey: Key.panelHeight).clamped(to: Self.panelHeightRange)
         widgets = Self.loadWidgets(from: defaults)
-        let rawSizes = defaults.dictionary(forKey: Key.cardSizes) as? [String: String] ?? [:]
-        cardSizes = rawSizes.reduce(into: [:]) { result, entry in
-            if let kind = WidgetKind(rawValue: entry.key), let size = CardSize(rawValue: entry.value) {
-                result[kind] = size
+        // Values are weights (numbers); the previous version stored "small"/"medium"/"large".
+        let rawSizes = defaults.dictionary(forKey: Key.cardSizes) ?? [:]
+        cardWeights = rawSizes.reduce(into: [:]) { result, entry in
+            guard let kind = WidgetKind(rawValue: entry.key) else { return }
+            if let weight = entry.value as? Double {
+                result[kind] = weight.clamped(to: PanelLayout.weightRange)
+            } else if let name = entry.value as? String, let size = CardSize(rawValue: name) {
+                result[kind] = size.weight
             }
         }
         haptics = defaults.bool(forKey: Key.haptics)
@@ -126,7 +130,7 @@ public final class NotchSettings: ObservableObject {
 
     public func resetWidgets() {
         widgets = .default
-        cardSizes = [:]
+        cardWeights = [:]
     }
 
     public func addWorldClock(_ identifier: String) {
@@ -139,12 +143,14 @@ public final class NotchSettings: ObservableObject {
         worldClockZones.removeAll { $0 == identifier }
     }
 
-    public func cardSize(for kind: WidgetKind) -> CardSize {
-        cardSizes[kind] ?? kind.defaultCardSize
+    public func cardWeight(for kind: WidgetKind) -> Double {
+        cardWeights[kind] ?? kind.defaultCardSize.weight
     }
 
-    public func setCardSize(_ size: CardSize, for kind: WidgetKind) {
-        cardSizes[kind] = size == kind.defaultCardSize ? nil : size
+    /// Sets a card's width weight, clamped. Back at its default, the override is dropped.
+    public func setCardWeight(_ weight: Double, for kind: WidgetKind) {
+        let clamped = weight.clamped(to: PanelLayout.weightRange)
+        cardWeights[kind] = abs(clamped - kind.defaultCardSize.weight) < 0.01 ? nil : clamped
     }
 
     /// Saved layout, else one migrated from v0.1's toggles, else the default.

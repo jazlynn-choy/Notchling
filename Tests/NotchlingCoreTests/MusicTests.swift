@@ -24,6 +24,17 @@ struct MusicTests {
         #expect(media.repeatRequests == [.all])
     }
 
+    @Test func playWithNothingPlayingStartsThePreferredPlayer() async throws {
+        let media = FakeMediaProvider()
+        let model = NotchModel(notchSize: .zero, media: media, power: FakePowerProvider())
+        model.preferredApp = .spotify
+        model.send(.playPause)
+        model.send(.nextTrack)   // meaningless without a track: ignored
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(media.resumed == [.spotify])
+        #expect(media.sent.isEmpty)
+    }
+
     @Test func cycleRepeatDoesNothingWithoutATrack() {
         let media = FakeMediaProvider()
         let model = NotchModel(notchSize: .zero, media: media, power: FakePowerProvider())

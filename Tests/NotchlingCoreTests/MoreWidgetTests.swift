@@ -2,42 +2,95 @@ import Foundation
 import Testing
 @testable import NotchlingCore
 
-@Suite("Panel card sizes")
+@Suite("Panel card sizes and dragging")
 struct PanelLayoutTests {
+    let weights = [CardSize.small.weight, CardSize.medium.weight, CardSize.large.weight]
+
     @Test func widthsFillTheSpaceExactly() {
-        let widths = PanelLayout.widths(for: [.small, .medium, .large], totalWidth: 600, spacing: 10)
+        let widths = PanelLayout.widths(for: weights, totalWidth: 600, spacing: 10)
         #expect(abs(widths.reduce(0, +) - 580) < 0.001)
         #expect(widths[0] < widths[1] && widths[1] < widths[2])
     }
 
-    @Test func equalSizesShareEqually() {
-        #expect(PanelLayout.widths(for: [.medium, .medium], totalWidth: 410, spacing: 10) == [200, 200])
+    @Test func equalWeightsShareEqually() {
+        #expect(PanelLayout.widths(for: [1.6, 1.6], totalWidth: 410, spacing: 10) == [200, 200])
     }
 
     @Test func smallCardsKeepAMinimumWidth() {
-        let widths = PanelLayout.widths(for: [.small, .large, .large, .large], totalWidth: 500, spacing: 10)
+        let widths = PanelLayout.widths(for: [1, 2.5, 2.5, 2.5], totalWidth: 500, spacing: 10)
         #expect(widths[0] >= 90)
     }
 
     @Test func emptyPanelHasNoWidths() {
         #expect(PanelLayout.widths(for: [], totalWidth: 500, spacing: 10).isEmpty)
     }
+
+    /// The resize handle should stay under the pointer: asking for a width gives that width.
+    @Test(arguments: [0, 1, 2])
+    func resizeHitsTheRequestedWidth(index: Int) {
+        let before = PanelLayout.widths(for: weights, totalWidth: 600, spacing: 10)
+        let target = before[index] + 20   // stays inside the weight limits (clamping is tested below)
+        var updated = weights
+        updated[index] = PanelLayout.weight(toMake: index, width: target, weights: weights,
+                                            totalWidth: 600, spacing: 10)
+        let after = PanelLayout.widths(for: updated, totalWidth: 600, spacing: 10)
+        #expect(abs(after[index] - target) < 0.5)
+    }
+
+    @Test func resizeIsClampedToTheAllowedRange() {
+        let huge = PanelLayout.weight(toMake: 0, width: 10_000, weights: weights, totalWidth: 600, spacing: 10)
+        let tiny = PanelLayout.weight(toMake: 0, width: 0, weights: weights, totalWidth: 600, spacing: 10)
+        #expect(huge == PanelLayout.weightRange.upperBound)
+        #expect(tiny == PanelLayout.weightRange.lowerBound)
+    }
+
+    @Test(arguments: [(0, 0.0, 0), (0, 80.0, 0), (0, 200.0, 1), (0, 500.0, 2), (2, -400.0, 0), (1, -60.0, 1)])
+    func dragLandsPastNeighboursCentres(index: Int, translation: Double, expected: Int) {
+        let widths = [150.0, 150.0, 150.0]
+        #expect(PanelLayout.targetIndex(moving: index, by: translation, widths: widths, spacing: 10) == expected)
+    }
+
+    @Test func transferMovesBetweenWingsOnlyWhenItFits() {
+        var layout = WidgetLayout(leftWing: [.time], rightWing: [.battery], panel: [])
+        let moved = layout.transfer(.time, from: .leftWing, to: .rightWing)
+        #expect(moved)
+        #expect(layout.leftWing.isEmpty && layout.rightWing == [.battery, .time])
+        let intoPanel = layout.transfer(.time, from: .rightWing, to: .panel)       // doesn't fit
+        let missing = layout.transfer(.date, from: .leftWing, to: .rightWing)    // not there
+        #expect(!intoPanel && !missing)
+    }
+
+    @Test(arguments: [(IndexSet([0]), 3, ["b", "c", "a"]), (IndexSet([2]), 0, ["c", "a", "b"]),
+                      (IndexSet([1]), 1, ["a", "b", "c"])])
+    func dragReorderInSettings(from: IndexSet, to: Int, expected: [String]) {
+        let names: [String: WidgetKind] = ["a": .time, "b": .battery, "c": .date]
+        var layout = WidgetLayout(leftWing: [.time, .battery, .date], rightWing: [], panel: [])
+        layout.move(fromOffsets: from, toOffset: to, in: .leftWing)
+        #expect(layout.leftWing == expected.map { names[$0]! })
+    }
 }
 
 @MainActor
 @Suite("Settings for new widgets")
 struct NewWidgetSettingsTests {
-    @Test func cardSizesPersistAndDefaultsArentStored() {
+    @Test func cardWeightsPersistClampAndDropDefaults() {
         let defaults = makeIsolatedDefaults()
         let settings = NotchSettings(defaults: defaults, loginItem: FakeLoginItem())
-        #expect(settings.cardSize(for: .remindersCard) == .large)
-        settings.setCardSize(.small, for: .remindersCard)
-        settings.setCardSize(.small, for: .dayCard)   // already its default
+        #expect(settings.cardWeight(for: .remindersCard) == CardSize.large.weight)
+        settings.setCardWeight(1.3, for: .remindersCard)
+        settings.setCardWeight(99, for: .musicCard)
+        settings.setCardWeight(CardSize.small.weight, for: .dayCard)   // its default: not stored
         let reloaded = NotchSettings(defaults: defaults, loginItem: FakeLoginItem())
-        #expect(reloaded.cardSize(for: .remindersCard) == .small)
-        #expect(reloaded.cardSizes == [.remindersCard: .small])
+        #expect(reloaded.cardWeights == [.remindersCard: 1.3, .musicCard: PanelLayout.weightRange.upperBound])
         reloaded.resetWidgets()
-        #expect(reloaded.cardSizes.isEmpty)
+        #expect(reloaded.cardWeights.isEmpty)
+    }
+
+    @Test func previousSmallMediumLargeSizesStillLoad() {
+        let defaults = makeIsolatedDefaults()
+        defaults.set(["remindersCard": "small", "musicCard": "large", "bogus": "huge"], forKey: "cardSizes")
+        let settings = NotchSettings(defaults: defaults, loginItem: FakeLoginItem())
+        #expect(settings.cardWeights == [.remindersCard: CardSize.small.weight, .musicCard: CardSize.large.weight])
     }
 
     @Test func musicSourceDefaultsToSpotifyOnlyWhenInstalled() {

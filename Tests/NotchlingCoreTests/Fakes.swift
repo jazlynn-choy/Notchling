@@ -57,7 +57,10 @@ final class FakeMediaProvider: MediaProviding, @unchecked Sendable {
     var isSpotifyInstalled = true
 
     func nowPlaying() async -> Track? { track }
-    func send(_ command: MediaCommand, to app: MediaApp) async {}
+    var sent: [MediaCommand] = []
+    var resumed: [MediaApp] = []
+    func send(_ command: MediaCommand, to app: MediaApp) async { sent.append(command) }
+    func resume(_ app: MediaApp) async { resumed.append(app) }
     func setRepeat(_ mode: RepeatMode, for app: MediaApp) async { repeatRequests.append(mode) }
 
     func searchLibrary(_ query: String, limit: Int) async -> [SongResult] {

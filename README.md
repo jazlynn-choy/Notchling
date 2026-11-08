@@ -8,8 +8,8 @@ A macOS menu-bar companion that turns the dead space around the MacBook camera n
   - **Beside the notch:** Claude Code status, now playing, date, time, battery, open reminders, focus timer, next calendar event, weather, world clock, countdown
   - **In the panel (up to 4 cards):** Claude Code sessions, music, Reminders, focus timer, Calendar, weather, world clocks, countdown, notes, a Today tile
 - **Claude Code in the notch:** see what each session is doing ("Editing NotchView.swift"), get a chime when it needs your permission or finishes, and see every session in one card.
-- **Size each card:** Small, Medium or Large, and make the whole panel up to 900×420 pt.
-- **Music, Spotify first:** play/pause/skip, **loop**, and **search all of Spotify** to play any song (after a one-time sign-in, below). Can search your Apple Music library instead.
+- **Arrange it your way:** click the ✏️ in the panel to drag cards into any order, drag a card's edge to make it any width, and add or remove cards. In Settings, drag rows to reorder and move wing widgets between sides. The whole panel goes up to 900×420 pt.
+- **Music, Spotify first:** album art, play/pause/skip, **loop**, and **search all of Spotify**. Picking a song plays it within its album, so the album keeps going. Play works even when nothing's playing yet. The Spotify sign-in renews itself in the background, so it stays connected. Can search your Apple Music library instead.
 - **Focus timer:** 5/15/25/50-minute sessions with a progress ring, a chime when done, and the time left shown beside the notch.
 - **Calendar:** your next event ("Standup 12m") beside the notch, and the rest of today in the panel.
 - **Everything else is adjustable** in Settings: wing width (down to zero), panel size, which Reminders list, haptics, and open at login.
@@ -74,7 +74,7 @@ The architecture, and why it's built this way, is written up in [docs/ARCHITECTU
 
 ## Testing
 
-The core module is covered by 142 tests: the Claude Code hook script (run for real against sample events) and its settings installer, layout geometry, the widget layout and its migration, card sizing, the focus timer, calendar labels, music search, the Spotify sign-in (including a real loopback-server test), weather parsing and caching, world clocks, date labels, sorting, AppleScript/IOKit parsing, settings persistence, and the reminders sync behaviour. The sync tests run against `FakeRemindersProvider`, so they need no permissions and touch none of your real data.
+The core module is covered by 153 tests: drag-to-reorder and resize math, the Claude Code hook script (run for real against sample events) and its settings installer, layout geometry, the widget layout and its migration, card sizing, the focus timer, calendar labels, music search, the Spotify sign-in (including a real loopback-server test), weather parsing and caching, world clocks, date labels, sorting, AppleScript/IOKit parsing, settings persistence, and the reminders sync behaviour. The sync tests run against `FakeRemindersProvider`, so they need no permissions and touch none of your real data.
 
 ```bash
 make test

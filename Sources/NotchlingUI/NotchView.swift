@@ -87,6 +87,7 @@ struct ExpandedView: View {
                 Text(model.now, format: .dateTime.hour().minute()).monospacedDigit()
                 Spacer(minLength: model.notchSize.width)
                 BatteryBadge(status: model.power, showsPercentage: true)
+                PanelEditControls()
                 IconButton(symbol: "gearshape.fill", label: "Settings", action: openSettings)
                 IconButton(symbol: "power", label: "Quit Notchling") { NSApp.terminate(nil) }
             }
@@ -95,22 +96,7 @@ struct ExpandedView: View {
             .frame(height: max(model.notchSize.height - 6, 20))
             .padding(.horizontal, 20)
 
-            HStack(alignment: .top, spacing: 10) {
-                let cards = settings.widgets.panel
-                if cards.isEmpty {
-                    Text("No panel widgets. Add some in Settings.")
-                        .font(.system(size: 11)).foregroundStyle(.white.opacity(0.5))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-                // Each card's share of the width comes from its size (S/M/L) in Settings.
-                let widths = PanelLayout.widths(for: cards.map(settings.cardSize(for:)),
-                                                totalWidth: geometry.expandedSize.width - 28,
-                                                spacing: 10)
-                ForEach(Array(zip(cards, widths)), id: \.0) { kind, width in
-                    PanelWidgetView(kind: kind, model: model)
-                        .frame(width: width)
-                }
-            }
+            PanelCards(model: model, totalWidth: geometry.expandedSize.width - 28)
             .padding(.horizontal, 14)
             .padding(.bottom, 12)
             .frame(maxHeight: .infinity, alignment: .top)

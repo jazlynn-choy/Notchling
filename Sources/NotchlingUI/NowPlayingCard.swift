@@ -27,16 +27,21 @@ struct NowPlayingCard: View {
                 IconButton(symbol: "magnifyingglass", label: "Search for a song") { search.isOpen = true }
             }
             HStack(spacing: 10) {
-                ControlButton(symbol: "backward.fill", label: "Previous track") { model.send(.previousTrack) }
+                Group {
+                    ControlButton(symbol: "backward.fill", label: "Previous track") { model.send(.previousTrack) }
+                }
+                .disabled(model.track == nil).opacity(model.track == nil ? 0.3 : 1)
+                // Always enabled: with nothing playing it starts Spotify (or Music).
                 ControlButton(symbol: model.track?.isPlaying == true ? "pause.fill" : "play.fill",
                               label: model.track?.isPlaying == true ? "Pause" : "Play",
                               size: 16) { model.send(.playPause) }
-                ControlButton(symbol: "forward.fill", label: "Next track") { model.send(.nextTrack) }
-                loopButton
+                Group {
+                    ControlButton(symbol: "forward.fill", label: "Next track") { model.send(.nextTrack) }
+                    loopButton
+                }
+                .disabled(model.track == nil).opacity(model.track == nil ? 0.3 : 1)
             }
             .frame(maxWidth: .infinity)
-            .disabled(model.track == nil)
-            .opacity(model.track == nil ? 0.3 : 1)
         }
     }
 
@@ -60,19 +65,36 @@ struct NowPlayingCard: View {
         .accessibilityLabel(label)
     }
 
+    /// The album cover when there is one, else a coloured tile. Clicking it plays or pauses.
     private var artwork: some View {
-        RoundedRectangle(cornerRadius: 10)
-            .fill(LinearGradient(colors: gradient, startPoint: .topLeading, endPoint: .bottomTrailing))
-            .overlay {
+        Button { model.send(.playPause) } label: {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(LinearGradient(colors: gradient, startPoint: .topLeading, endPoint: .bottomTrailing))
+                if let url = model.track?.artworkURL {
+                    AsyncImage(url: url) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Color.clear
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
                 if model.track?.isPlaying == true {
                     EqualizerBars().frame(width: 20, height: 16)
+                        .padding(4)
+                        .background(RoundedRectangle(cornerRadius: 5).fill(.black.opacity(0.35)))
                 } else {
-                    Image(systemName: "music.note").font(.system(size: 17, weight: .semibold))
+                    Image(systemName: "play.fill").font(.system(size: 16, weight: .semibold))
+                        .shadow(radius: 2)
                 }
             }
             .frame(width: 46, height: 46)
-            .opacity(model.track == nil ? 0.35 : 1)
-            .accessibilityHidden(true)
+            .opacity(model.track == nil ? 0.6 : 1)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(model.track?.isPlaying == true ? "Pause" : "Play")
+        .accessibilityLabel(model.track?.isPlaying == true ? "Pause" : "Play")
     }
 
     private var gradient: [Color] {
@@ -112,9 +134,16 @@ struct SongSearchView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(search.results) { song in
                         Button { search.play(song) } label: {
-                            VStack(alignment: .leading, spacing: 0) {
-                                Text(song.title).font(.system(size: 11, weight: .medium))
-                                Text(song.artist).font(.system(size: 9)).foregroundStyle(.white.opacity(0.5))
+                            HStack(spacing: 6) {
+                                if let url = song.artworkURL {
+                                    AsyncImage(url: url) { $0.resizable() } placeholder: { Color.white.opacity(0.1) }
+                                        .frame(width: 24, height: 24)
+                                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                                }
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text(song.title).font(.system(size: 11, weight: .medium))
+                                    Text(song.artist).font(.system(size: 9)).foregroundStyle(.white.opacity(0.5))
+                                }
                             }
                             .lineLimit(1)
                             .frame(maxWidth: .infinity, alignment: .leading)

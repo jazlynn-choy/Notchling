@@ -19,6 +19,8 @@ public protocol MediaProviding: Sendable {
     /// The playing track, or a paused one if nothing plays. Never launches a player.
     func nowPlaying() async -> Track?
     func send(_ command: MediaCommand, to app: MediaApp) async
+    /// Starts playback in `app` when nothing is playing yet, opening the app if needed.
+    func resume(_ app: MediaApp) async
     func setRepeat(_ mode: RepeatMode, for app: MediaApp) async
     /// Songs in the user's Music library whose title, artist or album match `query`.
     func searchLibrary(_ query: String, limit: Int) async -> [SongResult]

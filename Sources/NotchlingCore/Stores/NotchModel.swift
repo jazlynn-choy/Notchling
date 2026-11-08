@@ -13,6 +13,9 @@ public final class NotchModel: ObservableObject {
         didSet { if !mediaEnabled { track = nil } }
     }
 
+    /// Which player the play button starts when nothing is playing yet.
+    public var preferredApp: MediaApp = .spotify
+
     /// The physical notch size for the screen we're drawing on.
     public let notchSize: CGSize
 
@@ -52,7 +55,18 @@ public final class NotchModel: ObservableObject {
     }
 
     public func send(_ command: MediaCommand) {
-        guard let app = track?.app else { return }
+        let media = media
+        guard let app = track?.app else {
+            // Nothing playing: play starts the preferred player instead of doing nothing.
+            guard command == .playPause else { return }
+            let preferred = preferredApp
+            Task {
+                await media.resume(preferred)
+                try? await Task.sleep(for: .milliseconds(800))   // a just-opened player needs a moment
+                await refreshMedia()
+            }
+            return
+        }
         Task {
             await media.send(command, to: app)
             try? await Task.sleep(for: .milliseconds(300))   // let the player update its state

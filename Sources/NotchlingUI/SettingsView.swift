@@ -112,33 +112,50 @@ struct WidgetSlotSection: View {
             }
             ForEach(Array(widgets.enumerated()), id: \.element) { index, kind in
                 HStack(spacing: 10) {
+                    Image(systemName: "line.3.horizontal").foregroundStyle(.tertiary)
+                        .help("Drag to reorder")
                     Image(systemName: kind.symbol).frame(width: 18).foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(kind.title)
-                        Text(kind.summary).font(.caption).foregroundStyle(.secondary)
+                        Text(kind.summary).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                     }
                     Spacer()
                     if slot == .panel {
-                        Picker("Size of \(kind.title)", selection: Binding(
-                            get: { settings.cardSize(for: kind) },
-                            set: { settings.setCardSize($0, for: kind) })) {
-                            ForEach(CardSize.allCases) { Text($0.label).tag($0).help($0.title) }
+                        Slider(value: Binding(get: { settings.cardWeight(for: kind) },
+                                              set: { settings.setCardWeight($0, for: kind) }),
+                               in: PanelLayout.weightRange)
+                            .frame(width: 90)
+                            .help("Width of the \(kind.title) card")
+                            .accessibilityLabel("Width of \(kind.title)")
+                    }
+                    if let other = otherWing, settings.widgets.addable(to: other).contains(kind) {
+                        rowButton(slot == .leftWing ? "arrow.right.square" : "arrow.left.square",
+                                  "Move \(kind.title) to the \(other.title.lowercased())", disabled: false) {
+                            settings.widgets.transfer(kind, from: slot, to: other)
                         }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .fixedSize()
-                    }
-                    rowButton("chevron.up", "Move \(kind.title) earlier", disabled: index == 0) {
-                        settings.widgets.move(kind, in: slot, by: -1)
-                    }
-                    rowButton("chevron.down", "Move \(kind.title) later", disabled: index == widgets.count - 1) {
-                        settings.widgets.move(kind, in: slot, by: 1)
                     }
                     rowButton("minus.circle.fill", "Remove \(kind.title)", disabled: false) {
                         settings.widgets.remove(kind, from: slot)
                     }
                 }
+                .contextMenu {
+                    Button("Move earlier") { settings.widgets.move(kind, in: slot, by: -1) }.disabled(index == 0)
+                    Button("Move later") { settings.widgets.move(kind, in: slot, by: 1) }
+                        .disabled(index == widgets.count - 1)
+                    if let other = otherWing {
+                        Button("Move to \(other.title.lowercased())") {
+                            settings.widgets.transfer(kind, from: slot, to: other)
+                        }
+                        .disabled(!settings.widgets.addable(to: other).contains(kind))
+                    }
+                    Divider()
+                    Button("Remove", role: .destructive) { settings.widgets.remove(kind, from: slot) }
+                }
+                // Keyboard and VoiceOver users can't drag, so reordering is also an action.
+                .accessibilityAction(named: "Move earlier") { settings.widgets.move(kind, in: slot, by: -1) }
+                .accessibilityAction(named: "Move later") { settings.widgets.move(kind, in: slot, by: 1) }
             }
+            .onMove { from, to in settings.widgets.move(fromOffsets: from, toOffset: to, in: slot) }
             let addable = settings.widgets.addable(to: slot)
             Menu {
                 ForEach(addable) { kind in
@@ -157,10 +174,19 @@ struct WidgetSlotSection: View {
             if slot == .leftWing {
                 Text("Wing widgets show beside the notch when it's closed. Widen the bar above if they're cut off.")
             } else if slot == .panel {
-                Text("S, M and L set how much of the panel's width each card gets.")
+                Text("Drag rows to reorder. The slider sets each card's width. You can also drag and resize "
+                     + "cards right in the panel: open it and click the pencil.")
             }
         }
         .animation(.default, value: widgets)
+    }
+
+    private var otherWing: WidgetSlot? {
+        switch slot {
+        case .leftWing: return .rightWing
+        case .rightWing: return .leftWing
+        case .panel: return nil
+        }
     }
 
     private func rowButton(_ symbol: String, _ label: String, disabled: Bool,

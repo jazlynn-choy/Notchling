@@ -161,7 +161,8 @@ public enum WidgetKind: String, CaseIterable, Identifiable, Sendable {
     public var usesAgent: Bool { self == .agent || self == .agentCard }
 }
 
-/// How much of the panel's width a card takes, relative to the other cards.
+/// Starting sizes for panel cards. Users can then drag a card to any width in between;
+/// what's stored is the card's *weight*, its share of the width relative to the others.
 public enum CardSize: String, CaseIterable, Identifiable, Sendable {
     case small, medium, large
 
@@ -179,18 +180,56 @@ public enum CardSize: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Splits the panel's width between cards by their size.
+/// Splits the panel's width between cards by weight, and works out what a drag means.
+/// Pure math, so the editing behaviour is unit tested without SwiftUI.
 public enum PanelLayout {
-    /// Widths for cards of `sizes`, filling `totalWidth` with `spacing` between them. Every
+    /// The narrowest/widest a card can be made, as a weight.
+    public static let weightRange: ClosedRange<Double> = 0.5...4
+    public static let minimumWidth: Double = 90
+
+    /// Widths for cards with `weights`, filling `totalWidth` with `spacing` between them. Every
     /// card gets at least `minimum` (if there's room), so a small card can't be squeezed to nothing.
-    public static func widths(for sizes: [CardSize], totalWidth: Double, spacing: Double,
-                              minimum: Double = 90) -> [Double] {
-        guard !sizes.isEmpty else { return [] }
-        let available = max(0, totalWidth - spacing * Double(sizes.count - 1))
-        let floor = min(minimum, available / Double(sizes.count))
-        let extra = available - floor * Double(sizes.count)
-        let totalWeight = sizes.reduce(0) { $0 + $1.weight }
-        return sizes.map { floor + extra * $0.weight / totalWeight }
+    public static func widths(for weights: [Double], totalWidth: Double, spacing: Double,
+                              minimum: Double = minimumWidth) -> [Double] {
+        guard !weights.isEmpty else { return [] }
+        let (floor, extra) = split(count: weights.count, totalWidth: totalWidth, spacing: spacing, minimum: minimum)
+        let totalWeight = weights.reduce(0, +)
+        return weights.map { floor + extra * $0 / totalWeight }
+    }
+
+    /// The weight card `index` needs so that it ends up `targetWidth` wide, with the other
+    /// cards keeping their weights. This is what makes a resize handle track the pointer.
+    public static func weight(toMake index: Int, width targetWidth: Double, weights: [Double],
+                              totalWidth: Double, spacing: Double, minimum: Double = minimumWidth) -> Double {
+        guard weights.indices.contains(index), weights.count > 1 else { return weights.first ?? 1 }
+        let (floor, extra) = split(count: weights.count, totalWidth: totalWidth, spacing: spacing, minimum: minimum)
+        guard extra > 0 else { return weights[index] }
+        let others = weights.enumerated().filter { $0.offset != index }.reduce(0) { $0 + $1.element }
+        // width = floor + extra * w / (w + others)  →  w = others * q / (1 - q)
+        let share = min(max((targetWidth - floor) / extra, 0.001), 0.95)
+        return (others * share / (1 - share)).clamped(to: weightRange)
+    }
+
+    /// Where a card dragged sideways by `translation` should land: it moves past a neighbour
+    /// once its centre crosses the neighbour's centre.
+    public static func targetIndex(moving index: Int, by translation: Double, widths: [Double],
+                                   spacing: Double) -> Int {
+        guard widths.indices.contains(index) else { return index }
+        let centres = widths.indices.map { i in
+            widths[..<i].reduce(0, +) + spacing * Double(i) + widths[i] / 2
+        }
+        let draggedCentre = centres[index] + translation
+        var target = index
+        while target < widths.count - 1, draggedCentre > centres[target + 1] { target += 1 }
+        while target > 0, draggedCentre < centres[target - 1] { target -= 1 }
+        return target
+    }
+
+    private static func split(count: Int, totalWidth: Double, spacing: Double,
+                              minimum: Double) -> (floor: Double, extra: Double) {
+        let available = max(0, totalWidth - spacing * Double(count - 1))
+        let floor = min(minimum, available / Double(count))
+        return (floor, available - floor * Double(count))
     }
 }
 
@@ -249,6 +288,28 @@ public struct WidgetLayout: Equatable, Sendable {
     }
 
     /// Moves a widget one step earlier (negative offset) or later (positive) in its slot.
+    /// Moves a widget to the other wing (or between any two slots it fits). Returns whether
+    /// it moved: it won't if it doesn't fit there, is already there, or the slot is full.
+    @discardableResult
+    public mutating func transfer(_ kind: WidgetKind, from source: WidgetSlot, to destination: WidgetSlot) -> Bool {
+        guard source != destination, self[source].contains(kind), addable(to: destination).contains(kind) else {
+            return false
+        }
+        remove(kind, from: source)
+        add(kind, to: destination)
+        return true
+    }
+
+    /// For SwiftUI's `onMove` (drag to reorder in Settings).
+    public mutating func move(fromOffsets source: IndexSet, toOffset destination: Int, in slot: WidgetSlot) {
+        var items = self[slot]
+        let moving = source.sorted().filter(items.indices.contains).map { items[$0] }
+        let insertAt = destination - source.filter { $0 < destination }.count
+        for index in source.sorted(by: >) where items.indices.contains(index) { items.remove(at: index) }
+        items.insert(contentsOf: moving, at: min(max(insertAt, 0), items.count))
+        self[slot] = items
+    }
+
     public mutating func move(_ kind: WidgetKind, in slot: WidgetSlot, by offset: Int) {
         var items = self[slot]
         guard let from = items.firstIndex(of: kind) else { return }
