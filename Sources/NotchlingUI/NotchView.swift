@@ -47,53 +47,27 @@ struct CollapsedView: View {
     @ObservedObject var model: NotchModel
     let wingWidth: CGFloat
     @EnvironmentObject var settings: NotchSettings
-    @EnvironmentObject var reminders: RemindersStore
 
     var body: some View {
         HStack(spacing: 0) {
-            HStack(spacing: 6) { leftContent; Spacer(minLength: 0) }
-                .padding(.leading, 12)
-                .frame(width: wingWidth)
+            HStack(spacing: 6) {
+                ForEach(settings.widgets.leftWing) { WingWidgetView(kind: $0, model: model, wingWidth: wingWidth) }
+                Spacer(minLength: 0)
+            }
+            .padding(.leading, 12)
+            .frame(width: wingWidth)
 
             Spacer(minLength: model.notchSize.width)
 
             HStack(spacing: 6) {
                 Spacer(minLength: 0)
-                if settings.showTodoCount && reminders.openCount > 0 {
-                    CountBadge(count: reminders.openCount)
-                        .accessibilityLabel("\(reminders.openCount) open reminders")
-                }
-                if settings.showTime {
-                    Text(model.now, format: .dateTime.hour().minute())
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                }
-                if settings.showBattery {
-                    BatteryBadge(status: model.power, showsPercentage: false)
-                }
+                ForEach(settings.widgets.rightWing) { WingWidgetView(kind: $0, model: model, wingWidth: wingWidth) }
             }
             .padding(.trailing, 10)
             .frame(width: wingWidth)
         }
+        .lineLimit(1)
         .opacity(wingWidth < 30 ? 0 : 1)   // too narrow to show anything legible
-    }
-
-    @ViewBuilder private var leftContent: some View {
-        let playing = model.track?.isPlaying == true
-        switch settings.leftWing {
-        case .musicOrDate where playing, .music where playing:
-            EqualizerBars().frame(width: 14, height: 10)
-            if wingWidth > 70, let title = model.track?.title {
-                Text(title).font(.system(size: 11, weight: .semibold)).lineLimit(1)
-            }
-        case .musicOrDate, .date:
-            Text(model.now, format: .dateTime.weekday(.abbreviated).day())
-                .font(.system(size: 11, weight: .semibold))
-                .lineLimit(1)
-        case .music, .nothing:
-            EmptyView()
-        }
     }
 }
 
@@ -121,15 +95,31 @@ struct ExpandedView: View {
             .padding(.horizontal, 20)
 
             HStack(alignment: .top, spacing: 10) {
-                if settings.showMusicCard {
-                    NowPlayingCard(model: model)
-                        .frame(width: min(210, geometry.expandedSize.width * 0.45))
+                let cards = settings.widgets.panel
+                if cards.isEmpty {
+                    Text("No panel widgets. Add some in Settings.")
+                        .font(.system(size: 11)).foregroundStyle(.white.opacity(0.5))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                RemindersCard()
+                // Compact cards keep a fixed width and flexible ones share what's left.
+                // With no flexible card, everything shares equally.
+                let anyFlexible = cards.contains(where: \.isFlexible)
+                ForEach(cards) { kind in
+                    let fixed = anyFlexible && !kind.isFlexible ? compactWidth(for: kind) : nil
+                    PanelWidgetView(kind: kind, model: model)
+                        .frame(minWidth: fixed, maxWidth: fixed ?? .infinity)
+                }
             }
             .padding(.horizontal, 14)
             .padding(.bottom, 12)
             .frame(maxHeight: .infinity, alignment: .top)
+        }
+    }
+
+    private func compactWidth(for kind: WidgetKind) -> CGFloat {
+        switch kind {
+        case .dayCard: return 104
+        default: return min(210, geometry.expandedSize.width * 0.45)
         }
     }
 }

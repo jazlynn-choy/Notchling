@@ -8,8 +8,7 @@ struct NotchSettingsTests {
     @Test func freshInstallUsesDefaults() {
         let settings = NotchSettings(defaults: makeIsolatedDefaults(), loginItem: FakeLoginItem())
         #expect(settings.wingWidth == NotchSettings.defaultSizes.wing)
-        #expect(settings.leftWing == .musicOrDate)
-        #expect(settings.showBattery)
+        #expect(settings.widgets == .default)
         #expect(settings.selectedListID == nil)
     }
 
@@ -17,14 +16,14 @@ struct NotchSettingsTests {
         let defaults = makeIsolatedDefaults()
         let first = NotchSettings(defaults: defaults, loginItem: FakeLoginItem())
         first.wingWidth = 100
-        first.leftWing = .date
-        first.showTime = false
+        first.widgets.remove(.time, from: .rightWing)
+        first.widgets.add(.dayCard, to: .panel)
         first.reminderListID = "work"
 
         let second = NotchSettings(defaults: defaults, loginItem: FakeLoginItem())
         #expect(second.wingWidth == 100)
-        #expect(second.leftWing == .date)
-        #expect(!second.showTime)
+        #expect(!second.widgets.rightWing.contains(.time))
+        #expect(second.widgets.panel == [.musicCard, .remindersCard, .dayCard])
         #expect(second.selectedListID == "work")
     }
 
@@ -37,10 +36,36 @@ struct NotchSettingsTests {
         #expect(settings.panelHeight == NotchSettings.panelHeightRange.lowerBound)
     }
 
-    @Test func unknownLeftWingValueFallsBack() {
+    @Test func upgradeFromV01TogglesKeepsTheUsersChoices() {
         let defaults = makeIsolatedDefaults()
-        defaults.set("removed-option", forKey: NotchSettings.Key.leftWing)
-        #expect(NotchSettings(defaults: defaults, loginItem: FakeLoginItem()).leftWing == .musicOrDate)
+        defaults.set("date", forKey: "leftWing")
+        defaults.set(false, forKey: "showTime")
+        defaults.set(false, forKey: "showMusicCard")
+
+        let settings = NotchSettings(defaults: defaults, loginItem: FakeLoginItem())
+        #expect(settings.widgets.leftWing == [.date])
+        #expect(settings.widgets.rightWing == [.reminderCount, .battery])
+        #expect(settings.widgets.panel == [.remindersCard])
+        // Old keys are gone and the result is saved, so migration runs once.
+        #expect(defaults.object(forKey: "leftWing") == nil)
+        #expect(defaults.object(forKey: NotchSettings.Key.widgetLayout) != nil)
+    }
+
+    @Test func savedLayoutWinsOverLegacyKeys() {
+        let defaults = makeIsolatedDefaults()
+        defaults.set(["leftWing": ["time"], "rightWing": [], "panel": ["dayCard"]],
+                     forKey: NotchSettings.Key.widgetLayout)
+        defaults.set("date", forKey: "leftWing")
+        let settings = NotchSettings(defaults: defaults, loginItem: FakeLoginItem())
+        #expect(settings.widgets.leftWing == [.time])
+        #expect(settings.widgets.panel == [.dayCard])
+    }
+
+    @Test func resetWidgetsRestoresDefault() {
+        let settings = NotchSettings(defaults: makeIsolatedDefaults(), loginItem: FakeLoginItem())
+        settings.widgets.remove(.remindersCard, from: .panel)
+        settings.resetWidgets()
+        #expect(settings.widgets == .default)
     }
 
     @Test func resetSizesRestoresDefaults() {

@@ -21,17 +21,9 @@ public struct SettingsView: View {
                 Button("Reset sizes") { settings.resetSizes() }
             }
 
-            Section("Bar beside the notch") {
-                Picker("Left side shows", selection: $settings.leftWing) {
-                    ForEach(LeftWingContent.allCases) { Text($0.label).tag($0) }
-                }
-                Toggle("Open reminders count", isOn: $settings.showTodoCount)
-                Toggle("Time", isOn: $settings.showTime)
-                Toggle("Battery", isOn: $settings.showBattery)
-            }
+            ForEach(WidgetSlot.allCases) { WidgetSlotSection(slot: $0) }
 
-            Section("Panel") {
-                Toggle("Music controls", isOn: $settings.showMusicCard)
+            Section("Reminders") {
                 if reminders.access == .granted {
                     Picker("Reminders list", selection: $settings.reminderListID) {
                         Text("Default list").tag("")
@@ -43,6 +35,7 @@ public struct SettingsView: View {
             }
 
             Section("General") {
+                Button("Reset widgets to default") { settings.resetWidgets() }
                 Toggle("Haptic tap when the panel opens", isOn: $settings.haptics)
                 Toggle("Open at login", isOn: $settings.launchAtLogin)
                 if let error = settings.loginItemError {
@@ -51,8 +44,8 @@ public struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 420)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: 440)
+        .frame(minHeight: 480, idealHeight: 680)
     }
 }
 
@@ -73,5 +66,67 @@ struct LabeledSlider: View {
                 .accessibilityLabel(title)
             if let hint { Text(hint).font(.caption).foregroundStyle(.secondary) }
         }
+    }
+}
+
+/// One slot's widgets, in order, with controls to reorder, remove and add.
+struct WidgetSlotSection: View {
+    let slot: WidgetSlot
+    @EnvironmentObject var settings: NotchSettings
+
+    var body: some View {
+        let widgets = settings.widgets[slot]
+        Section {
+            if widgets.isEmpty {
+                Text("Empty").foregroundStyle(.secondary)
+            }
+            ForEach(Array(widgets.enumerated()), id: \.element) { index, kind in
+                HStack(spacing: 10) {
+                    Image(systemName: kind.symbol).frame(width: 18).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(kind.title)
+                        Text(kind.summary).font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    rowButton("chevron.up", "Move \(kind.title) earlier", disabled: index == 0) {
+                        settings.widgets.move(kind, in: slot, by: -1)
+                    }
+                    rowButton("chevron.down", "Move \(kind.title) later", disabled: index == widgets.count - 1) {
+                        settings.widgets.move(kind, in: slot, by: 1)
+                    }
+                    rowButton("minus.circle.fill", "Remove \(kind.title)", disabled: false) {
+                        settings.widgets.remove(kind, from: slot)
+                    }
+                }
+            }
+            let addable = settings.widgets.addable(to: slot)
+            Menu {
+                ForEach(addable) { kind in
+                    Button { settings.widgets.add(kind, to: slot) } label: {
+                        Label(kind.title, systemImage: kind.symbol)
+                    }
+                }
+            } label: {
+                Label(widgets.count >= slot.capacity ? "Full (\(slot.capacity) max)" : "Add widget",
+                      systemImage: "plus")
+            }
+            .disabled(addable.isEmpty)
+        } header: {
+            Text(slot.title)
+        } footer: {
+            if slot == .leftWing {
+                Text("Wing widgets show beside the notch when it's closed. Widen the bar above if they're cut off.")
+            }
+        }
+        .animation(.default, value: widgets)
+    }
+
+    private func rowButton(_ symbol: String, _ label: String, disabled: Bool,
+                           action: @escaping () -> Void) -> some View {
+        Button(action: action) { Image(systemName: symbol) }
+            .buttonStyle(.borderless)
+            .disabled(disabled)
+            .help(label)
+            .accessibilityLabel(label)
     }
 }

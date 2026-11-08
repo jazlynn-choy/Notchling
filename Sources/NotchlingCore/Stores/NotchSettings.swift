@@ -1,20 +1,5 @@
 import Foundation
 
-public enum LeftWingContent: String, CaseIterable, Identifiable, Sendable {
-    case musicOrDate, date, music, nothing
-
-    public var id: String { rawValue }
-
-    public var label: String {
-        switch self {
-        case .musicOrDate: return "Music, or date when nothing plays"
-        case .date: return "Date"
-        case .music: return "Music only"
-        case .nothing: return "Nothing"
-        }
-    }
-}
-
 /// Every user-adjustable option, persisted to `UserDefaults` the moment it changes.
 @MainActor
 public final class NotchSettings: ObservableObject {
@@ -22,11 +7,7 @@ public final class NotchSettings: ObservableObject {
         static let wingWidth = "wingWidth"
         static let panelWidth = "panelWidth"
         static let panelHeight = "panelHeight"
-        static let leftWing = "leftWing"
-        static let showTodoCount = "showTodoCount"
-        static let showTime = "showTime"
-        static let showBattery = "showBattery"
-        static let showMusicCard = "showMusicCard"
+        static let widgetLayout = "widgetLayout"
         static let haptics = "haptics"
         static let reminderListID = "reminderListID"
     }
@@ -48,20 +29,9 @@ public final class NotchSettings: ObservableObject {
     @Published public var panelHeight: Double {
         didSet { defaults.set(panelHeight, forKey: Key.panelHeight) }
     }
-    @Published public var leftWing: LeftWingContent {
-        didSet { defaults.set(leftWing.rawValue, forKey: Key.leftWing) }
-    }
-    @Published public var showTodoCount: Bool {
-        didSet { defaults.set(showTodoCount, forKey: Key.showTodoCount) }
-    }
-    @Published public var showTime: Bool {
-        didSet { defaults.set(showTime, forKey: Key.showTime) }
-    }
-    @Published public var showBattery: Bool {
-        didSet { defaults.set(showBattery, forKey: Key.showBattery) }
-    }
-    @Published public var showMusicCard: Bool {
-        didSet { defaults.set(showMusicCard, forKey: Key.showMusicCard) }
+    /// Which widgets show where. Edit it through `add`, `remove` and `move` on the layout.
+    @Published public var widgets: WidgetLayout {
+        didSet { defaults.set(widgets.storageValue, forKey: Key.widgetLayout) }
     }
     @Published public var haptics: Bool {
         didSet { defaults.set(haptics, forKey: Key.haptics) }
@@ -82,19 +52,13 @@ public final class NotchSettings: ObservableObject {
             Key.wingWidth: Self.defaultSizes.wing,
             Key.panelWidth: Self.defaultSizes.panelWidth,
             Key.panelHeight: Self.defaultSizes.panelHeight,
-            Key.leftWing: LeftWingContent.musicOrDate.rawValue,
-            Key.showTodoCount: true, Key.showTime: true, Key.showBattery: true,
-            Key.showMusicCard: true, Key.haptics: true, Key.reminderListID: "",
+            Key.haptics: true, Key.reminderListID: "",
         ])
         // Clamp on load so a hand-edited or stale preference can't break the layout.
         wingWidth = defaults.double(forKey: Key.wingWidth).clamped(to: Self.wingRange)
         panelWidth = defaults.double(forKey: Key.panelWidth).clamped(to: Self.panelWidthRange)
         panelHeight = defaults.double(forKey: Key.panelHeight).clamped(to: Self.panelHeightRange)
-        leftWing = LeftWingContent(rawValue: defaults.string(forKey: Key.leftWing) ?? "") ?? .musicOrDate
-        showTodoCount = defaults.bool(forKey: Key.showTodoCount)
-        showTime = defaults.bool(forKey: Key.showTime)
-        showBattery = defaults.bool(forKey: Key.showBattery)
-        showMusicCard = defaults.bool(forKey: Key.showMusicCard)
+        widgets = Self.loadWidgets(from: defaults)
         haptics = defaults.bool(forKey: Key.haptics)
         reminderListID = defaults.string(forKey: Key.reminderListID) ?? ""
         launchAtLogin = loginItem.isEnabled
@@ -111,6 +75,21 @@ public final class NotchSettings: ObservableObject {
         wingWidth = Self.defaultSizes.wing
         panelWidth = Self.defaultSizes.panelWidth
         panelHeight = Self.defaultSizes.panelHeight
+    }
+
+    public func resetWidgets() {
+        widgets = .default
+    }
+
+    /// Saved layout, else one migrated from v0.1's toggles, else the default.
+    private static func loadWidgets(from defaults: UserDefaults) -> WidgetLayout {
+        if let saved = WidgetLayout(storageValue: defaults.object(forKey: Key.widgetLayout)) {
+            return saved
+        }
+        guard let migrated = WidgetLayout.migrating(from: defaults) else { return .default }
+        defaults.set(migrated.storageValue, forKey: Key.widgetLayout)
+        WidgetLayout.legacyKeys.forEach(defaults.removeObject(forKey:))
+        return migrated
     }
 
     private func applyLoginItem() {

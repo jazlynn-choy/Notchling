@@ -4,7 +4,8 @@ A macOS menu-bar companion that turns the dead space around the MacBook camera n
 
 - **Collapsed:** slim black "wings" extend the notch and show what's playing (or the date), your open reminders count, the time, and battery.
 - **Hover the notch:** a panel drops down with music controls and your **Apple Reminders**, synced both ways: add or tick off a reminder here and it updates on your iPhone.
-- **Everything is adjustable** in Settings: wing width (down to zero), panel size, what each side shows, which Reminders list, haptics, and open at login.
+- **Pick your widgets.** Choose what goes on the left of the notch, the right, and in the panel, and in what order: now playing, date, time, battery, reminders count, music controls, Reminders, and a Today calendar tile.
+- **Everything else is adjustable** in Settings: wing width (down to zero), panel size, which Reminders list, haptics, and open at login.
 
 <!-- TODO: add a screenshot or GIF here — docs/demo.gif -->
 
@@ -42,7 +43,7 @@ The architecture, and why it's built this way, is written up in [docs/ARCHITECTU
 
 ## Testing
 
-The core module is covered by 39 unit tests: layout geometry, date labels, sorting, AppleScript/IOKit parsing, settings persistence, and the reminders sync behaviour. The sync tests run against `FakeRemindersProvider`, so they need no permissions and touch none of your real data.
+The core module is covered by 53 unit tests: layout geometry, the widget layout and its migration, date labels, sorting, AppleScript/IOKit parsing, settings persistence, and the reminders sync behaviour. The sync tests run against `FakeRemindersProvider`, so they need no permissions and touch none of your real data.
 
 ```bash
 make test

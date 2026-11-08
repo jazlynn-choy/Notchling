@@ -8,6 +8,11 @@ public final class NotchModel: ObservableObject {
     @Published public private(set) var power = PowerStatus(level: 100, isCharging: false)
     @Published public private(set) var track: Track?
 
+    /// Off when no visible widget shows music, so the app stops running AppleScript every 2s.
+    public var mediaEnabled = true {
+        didSet { if !mediaEnabled { track = nil } }
+    }
+
     /// The physical notch size for the screen we're drawing on.
     public let notchSize: CGSize
 
@@ -41,6 +46,7 @@ public final class NotchModel: ObservableObject {
     }
 
     public func refreshMedia() async {
+        guard mediaEnabled else { return }
         let latest = await media.nowPlaying()
         if latest != track { track = latest }
     }

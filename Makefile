@@ -11,6 +11,7 @@ app:            ## Release build wrapped in build/Notchling.app
 
 run: app        ## Build the app and (re)launch it
 	-pkill -x Notchling
+	@while pgrep -x Notchling >/dev/null; do sleep 0.1; done   # wait so open doesn't race the quit
 	open build/Notchling.app
 
 lint:           ## SwiftLint, warnings are errors

@@ -55,6 +55,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self] _ in self?.reposition() }
             .store(in: &subscriptions)
 
+        // Only run the AppleScript now-playing poll while some widget actually shows music.
+        settings.$widgets
+            .map { $0.allWidgets.contains(where: \.usesMedia) }
+            .removeDuplicates()
+            .sink { [weak self] enabled in self?.model.mediaEnabled = enabled }
+            .store(in: &subscriptions)
+
         settings.$reminderListID
             .removeDuplicates()
             .sink { [weak self] id in self?.reminders.listID = id.isEmpty ? nil : id }
@@ -134,8 +141,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let host = NSHostingView(rootView: SettingsView()
                 .environmentObject(settings)
                 .environmentObject(reminders))
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 420, height: 520),
-                                  styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 440, height: 680),
+                                  styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
             window.title = "Notchling Settings"
             window.contentView = host
             window.isReleasedWhenClosed = false

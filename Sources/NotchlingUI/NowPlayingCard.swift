@@ -27,7 +27,7 @@ struct NowPlayingCard: View {
             .opacity(model.track == nil ? 0.3 : 1)
         }
         .padding(10)
-        .frame(maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color.white.opacity(0.06)))
     }
 
