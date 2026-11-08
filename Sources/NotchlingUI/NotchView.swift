@@ -96,7 +96,7 @@ struct ExpandedView: View {
             .frame(height: max(model.notchSize.height - 6, 20))
             .padding(.horizontal, 20)
 
-            PanelCards(model: model, totalWidth: geometry.expandedSize.width - 28)
+            PanelCards(model: model)
             .padding(.horizontal, 14)
             .padding(.bottom, 12)
             .frame(maxHeight: .infinity, alignment: .top)

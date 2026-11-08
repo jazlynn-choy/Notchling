@@ -9,6 +9,7 @@ public final class NotchSettings: ObservableObject {
         static let panelHeight = "panelHeight"
         static let widgetLayout = "widgetLayout"
         static let cardSizes = "cardSizes"
+        static let cardHeights = "cardHeights"
         static let musicSource = "musicSource"
         static let worldClockZones = "worldClockZones"
         static let countdownTitle = "countdownTitle"
@@ -47,6 +48,13 @@ public final class NotchSettings: ObservableObject {
         didSet {
             let raw = Dictionary(uniqueKeysWithValues: cardWeights.map { ($0.key.rawValue, $0.value) })
             defaults.set(raw, forKey: Key.cardSizes)
+        }
+    }
+    /// Per-card height weights within a stack. Cards not listed share equally (weight 1).
+    @Published public private(set) var cardHeights: [WidgetKind: Double] {
+        didSet {
+            defaults.set(Dictionary(uniqueKeysWithValues: cardHeights.map { ($0.key.rawValue, $0.value) }),
+                         forKey: Key.cardHeights)
         }
     }
     /// Which app song search uses.
@@ -91,6 +99,11 @@ public final class NotchSettings: ObservableObject {
         panelWidth = defaults.double(forKey: Key.panelWidth).clamped(to: Self.panelWidthRange)
         panelHeight = defaults.double(forKey: Key.panelHeight).clamped(to: Self.panelHeightRange)
         widgets = Self.loadWidgets(from: defaults)
+        cardHeights = (defaults.dictionary(forKey: Key.cardHeights) ?? [:]).reduce(into: [:]) { result, entry in
+            if let kind = WidgetKind(rawValue: entry.key), let weight = entry.value as? Double, weight > 0 {
+                result[kind] = min(max(weight, 0.2), 5)
+            }
+        }
         // Values are weights (numbers); the previous version stored "small"/"medium"/"large".
         let rawSizes = defaults.dictionary(forKey: Key.cardSizes) ?? [:]
         cardWeights = rawSizes.reduce(into: [:]) { result, entry in
@@ -131,6 +144,7 @@ public final class NotchSettings: ObservableObject {
     public func resetWidgets() {
         widgets = .default
         cardWeights = [:]
+        cardHeights = [:]
     }
 
     public func addWorldClock(_ identifier: String) {
@@ -141,6 +155,21 @@ public final class NotchSettings: ObservableObject {
 
     public func removeWorldClock(_ identifier: String) {
         worldClockZones.removeAll { $0 == identifier }
+    }
+
+    public func cardHeight(for kind: WidgetKind) -> Double {
+        cardHeights[kind] ?? 1
+    }
+
+    public func setCardHeights(_ first: (WidgetKind, Double), _ second: (WidgetKind, Double)) {
+        cardHeights[first.0] = min(max(first.1, 0.2), 5)
+        cardHeights[second.0] = min(max(second.1, 0.2), 5)
+    }
+
+    /// A column's width comes from its top card, so stacking a card under another doesn't
+    /// change the column's width.
+    public func columnWeights(_ columns: [[WidgetKind]]) -> [Double] {
+        columns.map { $0.first.map(cardWeight(for:)) ?? 1 }
     }
 
     public func cardWeight(for kind: WidgetKind) -> Double {

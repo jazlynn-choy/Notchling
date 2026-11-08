@@ -111,16 +111,27 @@ struct WidgetSlotSection: View {
                 Text("Empty").foregroundStyle(.secondary)
             }
             ForEach(Array(widgets.enumerated()), id: \.element) { index, kind in
+                let isStacked = slot == .panel && settings.widgets.stacked.contains(kind)
                 HStack(spacing: 10) {
-                    Image(systemName: "line.3.horizontal").foregroundStyle(.tertiary)
-                        .help("Drag to reorder")
+                    Image(systemName: isStacked ? "arrow.turn.down.right" : "line.3.horizontal")
+                        .foregroundStyle(.tertiary)
+                        .padding(.leading, isStacked ? 14 : 0)
+                        .help(isStacked ? "Stacked under the card above" : "Drag to reorder")
                     Image(systemName: kind.symbol).frame(width: 18).foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(kind.title)
                         Text(kind.summary).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                     }
                     Spacer()
-                    if slot == .panel {
+                    if slot == .panel && index > 0 {
+                        rowButton(isStacked ? "rectangle.split.2x1" : "rectangle.split.1x2",
+                                  isStacked ? "Give \(kind.title) its own column"
+                                            : "Stack \(kind.title) under the card above",
+                                  disabled: !isStacked && !canStack(kind)) {
+                            settings.widgets.setStacked(kind, !isStacked)
+                        }
+                    }
+                    if slot == .panel && !isStacked {
                         Slider(value: Binding(get: { settings.cardWeight(for: kind) },
                                               set: { settings.setCardWeight($0, for: kind) }),
                                in: PanelLayout.weightRange)
@@ -148,6 +159,12 @@ struct WidgetSlotSection: View {
                         }
                         .disabled(!settings.widgets.addable(to: other).contains(kind))
                     }
+                    if slot == .panel && index > 0 {
+                        Button(isStacked ? "Give it its own column" : "Stack under the card above") {
+                            settings.widgets.setStacked(kind, !isStacked)
+                        }
+                        .disabled(!isStacked && !canStack(kind))
+                    }
                     Divider()
                     Button("Remove", role: .destructive) { settings.widgets.remove(kind, from: slot) }
                 }
@@ -174,11 +191,18 @@ struct WidgetSlotSection: View {
             if slot == .leftWing {
                 Text("Wing widgets show beside the notch when it's closed. Widen the bar above if they're cut off.")
             } else if slot == .panel {
-                Text("Drag rows to reorder. The slider sets each card's width. You can also drag and resize "
-                     + "cards right in the panel: open it and click the pencil.")
+                Text("Stack a card under the one above (up to \(WidgetLayout.maxStack) per column, "
+                     + "\(WidgetLayout.maxColumns) columns) to use the space better. The slider sets a column's width. "
+                     + "Easiest of all: open the panel, click the pencil, and drag cards where you want them.")
             }
         }
         .animation(.default, value: widgets)
+    }
+
+    /// Whether `kind` could join the column of the card above it.
+    private func canStack(_ kind: WidgetKind) -> Bool {
+        var trial = settings.widgets
+        return trial.setStacked(kind, true)
     }
 
     private var otherWing: WidgetSlot? {

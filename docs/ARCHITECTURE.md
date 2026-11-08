@@ -124,6 +124,15 @@ In edit mode, the hard parts are pure functions, tested without SwiftUI:
 - **Reordering** moves a card past a neighbour once its centre crosses the neighbour's centre, the same rule as iOS home screens.
 - Saved sizes from the previous S/M/L version still load. A "small" string becomes weight 1.
 
+### 17. Stacked columns without a new data shape
+To stack weather under music, the panel became columns of up to three cards. Rather than change the stored layout to nested arrays, `WidgetLayout` keeps the panel as a flat ordered list plus a set of cards that are *stacked under the card before them*:
+
+- Every older saved layout is valid as is (no flags means one card per column), so there's no migration.
+- Code that only needs "which widgets are shown" (polling decisions, Settings rows) keeps working on the flat list.
+- Structural edits go through `panelColumns` and `drop(_:at:)`, which build columns, change them, and write them back through one setter that enforces every limit: column height, column count, no empties, no duplicates. Odd cases are tested, like removing a top card (the one below takes its place rather than joining the column to its left) or moving a lone card right (the index shifts as its old column disappears).
+
+In the panel, cards are positioned from `PanelLayout.frames`, so the drop target under the pointer is a pure function of the point and those frames. Stack above or below by card half, new column in a column's outer fifth or the gap between columns. The divider between stacked cards moves weight between the pair only, so nothing else in the column shifts. All of this is tested.
+
 ### 16. Staying signed in to Spotify
 The access token lasts an hour. `keepAlive()` runs at launch, after every wake from sleep, and every 30 minutes, renewing the token once it's within 20 minutes of expiring. Being offline never signs you out; only Spotify rejecting the refresh token does, and then the UI says so instead of failing silently. Spotify can rotate refresh tokens, so the newest is always saved (tested).
 

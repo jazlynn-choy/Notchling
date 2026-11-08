@@ -8,85 +8,142 @@ public final class PanelEditor: ObservableObject {
     @Published public var isEditing = false {
         didSet { if !isEditing { endDrag() } }
     }
-    /// The card being dragged to a new position, and how far.
+    /// The card being dragged, how far, and where it would land.
     @Published var dragging: WidgetKind?
-    @Published var dragOffset: CGFloat = 0
-    /// Width of the card being resized when the drag began.
+    @Published var dragTranslation: CGSize = .zero
+    @Published var dropTarget: WidgetLayout.PanelDrop?
+    /// Captured when a resize starts, so the whole drag is measured from one stable baseline.
     var resizeStartWidth: CGFloat?
+    var pairStart: (weights: (Double, Double), heights: (Double, Double))?
 
     public init() {}
 
     func endDrag() {
         dragging = nil
-        dragOffset = 0
+        dragTranslation = .zero
+        dropTarget = nil
         resizeStartWidth = nil
+        pairStart = nil
     }
 }
 
-/// The panel's cards. In edit mode each card gets a drag handle, a resize edge and a remove button.
+/// The panel's cards, laid out as columns of stacked cards. In edit mode: drag a card
+/// anywhere (onto another card's lower half to stack under it, onto a column's edge for a
+/// column of its own), drag a right edge to change a column's width, drag the bar between
+/// stacked cards to change their heights, × to remove.
 struct PanelCards: View {
     @ObservedObject var model: NotchModel
-    let totalWidth: CGFloat
     @EnvironmentObject var settings: NotchSettings
     @EnvironmentObject var editor: PanelEditor
 
     static let spacing: CGFloat = 10
+    static let space = "panelCards"
 
     var body: some View {
-        let cards = settings.widgets.panel
-        let weights = cards.map(settings.cardWeight(for:))
-        let widths = PanelLayout.widths(for: weights, totalWidth: totalWidth, spacing: Self.spacing)
-        HStack(alignment: .top, spacing: Self.spacing) {
-            if cards.isEmpty {
-                Text(editor.isEditing ? "Add a card with + above." : "No panel widgets. Add some in Settings.")
-                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.5))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            ForEach(Array(cards.enumerated()), id: \.element) { index, kind in
-                let width = widths.indices.contains(index) ? widths[index] : 0
-                PanelWidgetView(kind: kind, model: model)
-                    .frame(width: width)
-                    .allowsHitTesting(!editor.isEditing)
-                    .overlay {
-                        if editor.isEditing {
-                            editOverlay(kind: kind, index: index, widths: widths, weights: weights)
-                        }
+        GeometryReader { proxy in
+            let columns = settings.widgets.panelColumns
+            let columnWeights = settings.columnWeights(columns)
+            let frames = PanelLayout.frames(columnWeights: columnWeights,
+                                            heightWeights: columns.map { $0.map(settings.cardHeight(for:)) },
+                                            size: proxy.size, spacing: Self.spacing)
+            ZStack(alignment: .topLeading) {
+                if columns.isEmpty {
+                    Text(editor.isEditing ? "Add a card with + above." : "No panel widgets. Add some in Settings.")
+                        .font(.system(size: 11)).foregroundStyle(.white.opacity(0.5))
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                }
+                ForEach(Array(columns.enumerated()), id: \.offset) { c, column in
+                    ForEach(Array(column.enumerated()), id: \.element) { r, kind in
+                        let frame = frames[c][r]
+                        let isDragged = editor.dragging == kind
+                        PanelWidgetView(kind: kind, model: model)
+                            .frame(width: frame.width, height: frame.height)
+                            .allowsHitTesting(!editor.isEditing)
+                            .overlay {
+                                if editor.isEditing {
+                                    EditOverlay(kind: kind, column: c, row: r, columns: columns, frames: frames,
+                                                columnWeights: columnWeights, panelSize: proxy.size)
+                                }
+                            }
+                            .scaleEffect(isDragged ? 0.92 : 1)
+                            .opacity(isDragged ? 0.85 : 1)
+                            .offset(x: frame.minX + (isDragged ? editor.dragTranslation.width : 0),
+                                    y: frame.minY + (isDragged ? editor.dragTranslation.height : 0))
+                            .zIndex(isDragged ? 1 : 0)
                     }
-                    .offset(x: editor.dragging == kind ? editor.dragOffset : 0)
-                    .zIndex(editor.dragging == kind ? 1 : 0)
-                    .scaleEffect(editor.dragging == kind ? 1.03 : 1)
+                }
+                if let target = editor.dropTarget {
+                    DropIndicator(target: target, columns: columns, frames: frames, height: proxy.size.height)
+                }
             }
+            .coordinateSpace(name: Self.space)
+            .animation(editor.dragging == nil && editor.resizeStartWidth == nil && editor.pairStart == nil
+                       ? .spring(response: 0.3) : nil, value: settings.widgets)
         }
-        .animation(editor.dragging == nil && editor.resizeStartWidth == nil ? .spring(response: 0.3) : nil,
-                   value: cards)
+    }
+}
+
+/// Where the dragged card will go: a vertical bar for a new column, a horizontal bar for a stack.
+struct DropIndicator: View {
+    let target: WidgetLayout.PanelDrop
+    let columns: [[WidgetKind]]
+    let frames: [[CGRect]]
+    let height: CGFloat
+
+    var body: some View {
+        let rect = indicatorRect
+        Capsule().fill(Color.accentColor)
+            .shadow(color: .accentColor.opacity(0.8), radius: 4)
+            .frame(width: rect.width, height: rect.height)
+            .offset(x: rect.minX, y: rect.minY)
+            .allowsHitTesting(false)
     }
 
-    private func editOverlay(kind: WidgetKind, index: Int, widths: [Double], weights: [Double]) -> some View {
+    private var indicatorRect: CGRect {
+        switch target {
+        case .newColumn(let index):
+            let x: CGFloat
+            if frames.isEmpty { x = 0 }
+            else if index >= frames.count { x = (frames.last?.first?.maxX ?? 0) + PanelCards.spacing / 2 }
+            else { x = (frames[index].first?.minX ?? 0) - PanelCards.spacing / 2 }
+            return CGRect(x: x - 2, y: 0, width: 4, height: height)
+        case .above(let kind), .below(let kind):
+            guard let c = columns.firstIndex(where: { $0.contains(kind) }),
+                  let r = columns[c].firstIndex(of: kind) else { return .zero }
+            let card = frames[c][r]
+            let gap = PanelLayout.stackSpacing / 2
+            let y = target == .above(kind) ? card.minY - gap : card.maxY + gap
+            return CGRect(x: card.minX, y: y - 2, width: card.width, height: 4)
+        }
+    }
+}
+
+struct EditOverlay: View {
+    let kind: WidgetKind
+    let column: Int
+    let row: Int
+    let columns: [[WidgetKind]]
+    let frames: [[CGRect]]
+    let columnWeights: [Double]
+    let panelSize: CGSize
+    @EnvironmentObject var settings: NotchSettings
+    @EnvironmentObject var editor: PanelEditor
+
+    var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 14)
                 .strokeBorder(Color.white.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-                .background(RoundedRectangle(cornerRadius: 14).fill(Color.black.opacity(0.35)))
+                .background(RoundedRectangle(cornerRadius: 14).fill(Color.black.opacity(0.4)))
 
-            // Centre: drag to reorder.
-            VStack(spacing: 4) {
-                Image(systemName: "arrow.left.and.right").font(.system(size: 14, weight: .semibold))
+            // Middle: drag the card anywhere.
+            VStack(spacing: 3) {
+                Image(systemName: "arrow.up.and.down.and.arrow.left.and.right")
+                    .font(.system(size: 12, weight: .semibold))
                 Text(kind.title).font(.system(size: 10, weight: .semibold)).lineLimit(1)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 3, coordinateSpace: .global)
-                    .onChanged { value in
-                        editor.dragging = kind
-                        editor.dragOffset = value.translation.width
-                    }
-                    .onEnded { value in
-                        let target = PanelLayout.targetIndex(moving: index, by: value.translation.width,
-                                                             widths: widths, spacing: Self.spacing)
-                        settings.widgets.move(kind, in: .panel, by: target - index)
-                        editor.endDrag()
-                    }
-            )
+            .gesture(moveGesture)
             .accessibilityLabel("Drag to move \(kind.title)")
 
             // Top-right: remove.
@@ -105,34 +162,85 @@ struct PanelCards: View {
             }
             .padding(5)
 
-            // Right edge: drag to resize. Hidden with a single card, which always fills the panel.
-            if widths.count > 1 {
+            // Right edge: the column's width (hidden with a single column, which fills the panel).
+            if columns.count > 1 {
                 HStack {
                     Spacer()
-                    Capsule().fill(Color.white)
-                        .frame(width: 4, height: 30)
-                        .padding(.horizontal, 4)
+                    handle(width: 4, height: 28, cursor: .resizeLeftRight)
+                        .padding(.horizontal, 3)
                         .frame(maxHeight: .infinity)
                         .contentShape(Rectangle())
-                        .onHover { inside in
-                            if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
-                        }
-                        .gesture(
-                            DragGesture(minimumDistance: 1, coordinateSpace: .global)
-                                .onChanged { value in
-                                    let start = editor.resizeStartWidth ?? widths[index]
-                                    editor.resizeStartWidth = start
-                                    let weight = PanelLayout.weight(toMake: index, width: start + value.translation.width,
-                                                                    weights: weights, totalWidth: totalWidth,
-                                                                    spacing: Self.spacing)
-                                    settings.setCardWeight(weight, for: kind)
-                                }
-                                .onEnded { _ in editor.endDrag() }
-                        )
-                        .accessibilityLabel("Drag to resize \(kind.title)")
+                        .gesture(widthGesture)
+                        .accessibilityLabel("Drag to resize the column")
+                }
+            }
+
+            // Bottom edge: the split with the card below in the same stack.
+            if row < columns[column].count - 1 {
+                VStack {
+                    Spacer()
+                    handle(width: 28, height: 4, cursor: .resizeUpDown)
+                        .padding(.vertical, 2)
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
+                        .gesture(heightGesture)
+                        .accessibilityLabel("Drag to change the heights")
                 }
             }
         }
+    }
+
+    private func handle(width: CGFloat, height: CGFloat, cursor: NSCursor) -> some View {
+        Capsule().fill(Color.white)
+            .frame(width: width, height: height)
+            .onHover { inside in
+                if inside { cursor.push() } else { NSCursor.pop() }
+            }
+    }
+
+    private var moveGesture: some Gesture {
+        DragGesture(minimumDistance: 3, coordinateSpace: .named(PanelCards.space))
+            .onChanged { value in
+                editor.dragging = kind
+                editor.dragTranslation = value.translation
+                editor.dropTarget = PanelLayout.dropTarget(at: value.location, frames: frames,
+                                                           columns: columns, dragging: kind)
+            }
+            .onEnded { value in
+                if let target = PanelLayout.dropTarget(at: value.location, frames: frames,
+                                                       columns: columns, dragging: kind) {
+                    settings.widgets.drop(kind, at: target)
+                }
+                editor.endDrag()
+            }
+    }
+
+    private var widthGesture: some Gesture {
+        DragGesture(minimumDistance: 1, coordinateSpace: .named(PanelCards.space))
+            .onChanged { value in
+                let start = editor.resizeStartWidth ?? frames[column][row].width
+                editor.resizeStartWidth = start
+                let weight = PanelLayout.weight(toMake: column, width: start + value.translation.width,
+                                                weights: columnWeights, totalWidth: panelSize.width,
+                                                spacing: PanelCards.spacing)
+                settings.setCardWeight(weight, for: columns[column][0])
+            }
+            .onEnded { _ in editor.endDrag() }
+    }
+
+    private var heightGesture: some Gesture {
+        DragGesture(minimumDistance: 1, coordinateSpace: .named(PanelCards.space))
+            .onChanged { value in
+                let below = columns[column][row + 1]
+                let start = editor.pairStart ?? (
+                    weights: (settings.cardHeight(for: kind), settings.cardHeight(for: below)),
+                    heights: (frames[column][row].height, frames[column][row + 1].height))
+                editor.pairStart = start
+                let (top, bottom) = PanelLayout.resizePair(weights: start.weights, heights: start.heights,
+                                                           delta: value.translation.height)
+                settings.setCardHeights((kind, top), (below, bottom))
+            }
+            .onEnded { _ in editor.endDrag() }
     }
 }
 
