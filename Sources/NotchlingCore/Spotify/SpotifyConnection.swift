@@ -85,9 +85,11 @@ public final class SpotifyConnection: ObservableObject {
             tokens = fresh
             secrets.write(fresh.refreshToken, for: Self.refreshTokenKey)
             status = .connected
+            Log.spotify.info("Signed in to Spotify")
         } catch {
             callback.cancel()
             status = .failed(error.localizedDescription)
+            Log.spotify.error("Sign-in failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -107,7 +109,12 @@ public final class SpotifyConnection: ObservableObject {
     /// only Spotify rejecting the refresh token is.
     public func keepAlive() async {
         guard tokens != nil else { return }
-        _ = try? await accessToken(minimumValidity: 20 * 60)
+        do {
+            _ = try await accessToken(minimumValidity: 20 * 60)
+        } catch {
+            // Usually just offline; the next run retries.
+            Log.spotify.notice("Couldn't renew the sign-in: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     /// A valid access token, refreshed first if it expires within `minimumValidity` seconds.
@@ -139,6 +146,7 @@ public final class SpotifyConnection: ObservableObject {
             // The refresh token was revoked (e.g. removed in Spotify's account page).
             disconnect()
             status = .failed(Self.signedOutMessage)
+            Log.spotify.notice("Spotify rejected the saved sign-in; signed out")
             throw SpotifyError.notConnected
         }
     }

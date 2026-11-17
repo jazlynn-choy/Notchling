@@ -10,6 +10,7 @@ struct CalendarCard: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 5) {
                 Image(systemName: "calendar").font(.system(size: 10, weight: .bold)).foregroundStyle(.red)
+                    .accessibilityHidden(true)
                 Text("Calendar").font(.system(size: 11, weight: .bold))
             }
             switch calendar.access {

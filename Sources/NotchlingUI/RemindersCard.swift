@@ -22,6 +22,7 @@ struct RemindersCard: View {
     private var header: some View {
         HStack(spacing: 5) {
             Image(systemName: "checklist").font(.system(size: 10, weight: .bold)).foregroundStyle(.yellow)
+                .accessibilityHidden(true)
             Text("Reminders").font(.system(size: 11, weight: .bold))
             if reminders.openCount > 0 {
                 Text("\(reminders.openCount)").font(.system(size: 10, weight: .semibold))
@@ -54,6 +55,7 @@ struct RemindersCard: View {
         HStack(spacing: 6) {
             Image(systemName: "plus").font(.system(size: 9, weight: .bold))
                 .foregroundStyle(.white.opacity(0.5))
+                .accessibilityHidden(true)
             NotchTextField(placeholder: "Add a reminder", text: $reminders.draft) {
                 Task { await reminders.addDraft() }
             }

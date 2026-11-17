@@ -86,6 +86,7 @@ public final class MusicSearch: ObservableObject {
             case .failure(let error):
                 results = []
                 errorMessage = error.localizedDescription
+                Log.media.notice("Song search failed: \(error.localizedDescription, privacy: .public)")
             }
             isSearching = false
         }

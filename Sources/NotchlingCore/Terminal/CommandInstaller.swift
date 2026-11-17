@@ -114,6 +114,7 @@ public final class CommandSetup: ObservableObject {
                 + "echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.zshrc"
         } catch {
             message = error.localizedDescription
+            Log.terminal.error("Installing the notch command failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 

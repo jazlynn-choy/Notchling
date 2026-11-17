@@ -118,6 +118,7 @@ struct SongSearchView: View {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").font(.system(size: 9, weight: .bold))
                     .foregroundStyle(.white.opacity(0.5))
+                    .accessibilityHidden(true)
                 TextField(search.source == .spotify ? "Search Spotify" : "Search your Music library",
                           text: $search.query)
                     .textFieldStyle(.plain)

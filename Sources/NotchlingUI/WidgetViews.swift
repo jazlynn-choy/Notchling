@@ -41,8 +41,9 @@ struct WingWidgetView: View {
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                 }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("Focus timer")
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(focus.state == .finished ? "Focus timer finished"
+                                    : "Focus timer, \(FocusTimer.format(focus.remaining(at: model.now))) left")
             }
         case .nextEvent:
             if let event = calendar.nextEvent(at: model.now) {
@@ -56,7 +57,8 @@ struct WingWidgetView: View {
                         .foregroundStyle(.white.opacity(0.7))
                         .fixedSize()
                 }
-                .accessibilityElement(children: .combine)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Next event: \(event.title), \(EventTimeLabel.full(for: event, now: model.now))")
             }
         case .weather:
             WeatherWing()
@@ -82,6 +84,8 @@ struct WingWidgetView: View {
                     Text(title).font(.system(size: 11, weight: .semibold))
                 }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Now playing: \(model.track?.title ?? "music")")
         }
     }
 
@@ -97,6 +101,13 @@ struct PanelWidgetView: View {
     @ObservedObject var model: NotchModel
 
     var body: some View {
+        // Named as a group, so VoiceOver says which card it has moved into.
+        card
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(kind.title)
+    }
+
+    @ViewBuilder private var card: some View {
         switch kind {
         case .musicCard: NowPlayingCard(model: model)
         case .remindersCard: RemindersCard()

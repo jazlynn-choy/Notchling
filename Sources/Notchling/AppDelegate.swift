@@ -56,6 +56,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var geometry: NotchGeometry { settings.geometry(notchSize: model.notchSize) }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+        Log.app.info("Notchling \(version, privacy: .public) launched")
         screen = NSScreen.withNotch ?? NSScreen.main ?? NSScreen.screens[0]
         startModel(notchSize: screen.notchSize)
         buildPanel()

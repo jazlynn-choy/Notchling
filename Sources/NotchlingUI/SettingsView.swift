@@ -119,6 +119,7 @@ struct WidgetSlotSection: View {
                         .padding(.leading, isStacked ? 14 : 0)
                         .help(isStacked ? "Stacked under the card above" : "Drag to reorder")
                     Image(systemName: kind.symbol).frame(width: 18).foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(kind.title)
                         Text(kind.summary).font(.caption).foregroundStyle(.secondary).lineLimit(2)

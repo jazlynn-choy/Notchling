@@ -68,6 +68,7 @@ public struct LoopbackCallbackServer: AuthCallbackReceiving {
                 listener.start(queue: queue)
                 self.listener = listener
             } catch {
+                Log.spotify.error("Couldn't start the sign-in listener: \(error.localizedDescription, privacy: .public)")
                 finish(.failure(error))
             }
         }

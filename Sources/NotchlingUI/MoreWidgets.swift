@@ -68,17 +68,22 @@ struct WeatherCard: View {
             if let place = weather.place {
                 Text(place.name).font(.system(size: 11, weight: .bold)).lineLimit(1)
                 if let report = weather.report {
-                    HStack(spacing: 6) {
-                        Image(systemName: report.condition.symbol(isDay: report.isDay))
-                            .symbolRenderingMode(.multicolor)
-                            .font(.system(size: 24))
-                        Text(WeatherStore.degrees(report.temperature))
-                            .font(.system(size: 26, weight: .light, design: .rounded))
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Image(systemName: report.condition.symbol(isDay: report.isDay))
+                                .symbolRenderingMode(.multicolor)
+                                .font(.system(size: 24))
+                            Text(WeatherStore.degrees(report.temperature))
+                                .font(.system(size: 26, weight: .light, design: .rounded))
+                        }
+                        Text(report.condition.label).font(.system(size: 10)).foregroundStyle(.white.opacity(0.7))
+                        Text("H \(WeatherStore.degrees(report.high))  L \(WeatherStore.degrees(report.low))")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.5))
                     }
-                    Text(report.condition.label).font(.system(size: 10)).foregroundStyle(.white.opacity(0.7))
-                    Text("H \(WeatherStore.degrees(report.high))  L \(WeatherStore.degrees(report.low))")
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(report.condition.label), \(WeatherStore.degrees(report.temperature)), "
+                        + "high \(WeatherStore.degrees(report.high)), low \(WeatherStore.degrees(report.low))")
                 } else if let error = weather.lastError {
                     Text(error).font(.system(size: 10)).foregroundStyle(.orange)
                 } else {
@@ -86,6 +91,7 @@ struct WeatherCard: View {
                 }
             } else {
                 Image(systemName: "cloud.sun").font(.system(size: 18)).foregroundStyle(.white.opacity(0.5))
+                    .accessibilityHidden(true)
                 Text("Pick a city in Settings").font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
             }
         }
@@ -159,6 +165,7 @@ struct NotesCard: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 5) {
                 Image(systemName: "note.text").font(.system(size: 10, weight: .bold)).foregroundStyle(.yellow)
+                    .accessibilityHidden(true)
                 Text("Notes").font(.system(size: 11, weight: .bold))
             }
             ZStack(alignment: .topLeading) {

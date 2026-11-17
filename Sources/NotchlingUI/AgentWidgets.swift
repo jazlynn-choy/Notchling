@@ -71,6 +71,7 @@ struct AgentCard: View {
             HStack(spacing: 5) {
                 Image(systemName: "sparkle").font(.system(size: 10, weight: .bold))
                     .foregroundStyle(AgentState.working.color)
+                    .accessibilityHidden(true)
                 Text("Claude Code").font(.system(size: 11, weight: .bold))
             }
             if agents.sessions.isEmpty {

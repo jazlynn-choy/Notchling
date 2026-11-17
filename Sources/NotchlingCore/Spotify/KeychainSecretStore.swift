@@ -27,12 +27,16 @@ public struct KeychainSecretStore: SecretStore {
 
     public func write(_ value: String, for key: String) {
         let data = Data(value.utf8)
-        let status = SecItemUpdate(query(key) as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        var status = SecItemUpdate(query(key) as CFDictionary, [kSecValueData as String: data] as CFDictionary)
         if status == errSecItemNotFound {
             var item = query(key)
             item[kSecValueData as String] = data
             item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-            SecItemAdd(item as CFDictionary, nil)
+            status = SecItemAdd(item as CFDictionary, nil)
+        }
+        if status != errSecSuccess {
+            // The key name is safe to log; the value never is.
+            Log.app.error("Keychain write failed for \(key, privacy: .public): OSStatus \(status)")
         }
     }
 
