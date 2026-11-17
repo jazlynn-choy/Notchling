@@ -101,11 +101,25 @@ The architecture, and why it's built this way, is written up in [docs/ARCHITECTU
 
 ## Testing
 
-The core module is covered by 189 tests: the approval hook script (run for real: Allow, Deny and fall back to the terminal), the `notch` command's progress parsing and activity lifecycle, stacking, drop targets, drag-to-reorder and resize math, the Claude Code hook script (run for real against sample events) and its settings installer, layout geometry, the widget layout and its migration, card sizing, the focus timer, calendar labels, music search, the Spotify sign-in (including a real loopback-server test), weather parsing and caching, world clocks, date labels, sorting, AppleScript/IOKit parsing, settings persistence, and the reminders sync behaviour. The sync tests run against `FakeRemindersProvider`, so they need no permissions and touch none of your real data.
+The core module is covered by 190 tests: the approval hook script (run for real: Allow, Deny and fall back to the terminal), the `notch` command's progress parsing and activity lifecycle, stacking, drop targets, drag-to-reorder and resize math, the Claude Code hook script (run for real against sample events) and its settings installer, layout geometry, the widget layout and its migration, card sizing, the focus timer, calendar labels, music search, the Spotify sign-in (including a real loopback-server test), weather parsing and caching, world clocks, date labels, sorting, AppleScript/IOKit parsing, settings persistence, and the reminders sync behaviour. The sync tests run against `FakeRemindersProvider`, so they need no permissions and touch none of your real data.
 
 ```bash
 make test
 ```
+
+## Troubleshooting
+
+Notchling writes to the macOS unified log. To watch it live:
+
+```bash
+log stream --predicate 'subsystem == "local.notchling"' --level debug
+```
+
+Tokens, prompts and the text of your notes and reminders are never logged.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to build, test and send a pull request, [CHANGELOG.md](CHANGELOG.md) for what changed in each version, and [SECURITY.md](SECURITY.md) to report a security problem privately.
 
 ## Releasing
 

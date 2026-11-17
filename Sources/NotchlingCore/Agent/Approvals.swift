@@ -162,9 +162,11 @@ public struct DirectoryApprovalChannel: ApprovalChannel {
             } else {
                 try FileManager.default.moveItem(at: temp, to: final)
             }
+            Log.agent.info("Answered a permission request: \(decision.rawValue, privacy: .public)")
             return true
         } catch {
             try? FileManager.default.removeItem(at: temp)
+            Log.agent.error("Couldn't save a permission answer: \(error.localizedDescription, privacy: .public)")
             return false
         }
     }

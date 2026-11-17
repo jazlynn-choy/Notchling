@@ -119,6 +119,7 @@ public final class ClaudeHookSetup: ObservableObject {
             lastError = nil
         } catch {
             lastError = "Couldn't update ~/.claude/settings.json: \(error.localizedDescription)"
+            Log.agent.error("Changing the Claude Code hooks failed: \(error.localizedDescription, privacy: .public)")
         }
         isInstalled = installer.isInstalled
     }

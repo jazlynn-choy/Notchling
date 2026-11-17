@@ -51,6 +51,7 @@ public final class RemindersStore: ObservableObject {
             lastError = nil
         } catch {
             lastError = error.localizedDescription
+            Log.reminders.error("Loading reminders failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -63,6 +64,7 @@ public final class RemindersStore: ObservableObject {
             await reload()
         } catch {
             lastError = error.localizedDescription
+            Log.reminders.error("Adding a reminder failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -92,6 +94,7 @@ public final class RemindersStore: ObservableObject {
         } catch {
             if let index = items.firstIndex(where: { $0.id == id }) { items[index].isDone = false }
             lastError = error.localizedDescription
+            Log.reminders.error("Completing a reminder failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 

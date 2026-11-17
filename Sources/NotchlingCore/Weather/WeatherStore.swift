@@ -68,6 +68,7 @@ public final class WeatherStore: ObservableObject {
         } catch {
             // Keep showing the last report; a blip in the network shouldn't blank the widget.
             lastError = "Couldn't update the weather."
+            Log.weather.notice("Forecast update failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 

@@ -143,7 +143,12 @@ public struct AppleScriptMediaProvider: MediaProviding {
         let output = Pipe()
         process.standardOutput = output
         process.standardError = Pipe()
-        do { try process.run() } catch { return nil }
+        do {
+            try process.run()
+        } catch {
+            Log.media.error("Couldn't run osascript: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
         let data = output.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
         guard process.terminationStatus == 0 else { return nil }

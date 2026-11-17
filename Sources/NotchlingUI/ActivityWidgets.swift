@@ -84,6 +84,7 @@ struct ActivityCard: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 5) {
                 Image(systemName: "terminal").font(.system(size: 10, weight: .bold)).foregroundStyle(.cyan)
+                    .accessibilityHidden(true)
                 Text("Terminal").font(.system(size: 11, weight: .bold))
                 Spacer()
                 if activities.activities.contains(where: \.isFinished) {
